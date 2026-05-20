@@ -264,6 +264,7 @@ class ImageProcessor {
         this.id = Math.random().toString(36).substr(2, 9);
         this.config = {
             forceMode: 'auto',
+            forcePosition: 'auto', // 浮水印位置設定，預設為 auto
             alphaGain: 0.5, // 浮水印強度增益，預設 0.5 適用最新 Gemini 浮水印
             autoStrength: true // 是否開啟自動強度偵測
         };
@@ -301,10 +302,17 @@ class ImageProcessor {
             <div class="card-controls">
                 <div class="card-options">
                     <div class="control-group">
-                        <select aria-label="浮水印大小">
+                        <select class="size-select" aria-label="浮水印大小">
                             <option value="auto" data-i18n="sizeAuto">${Localization.get('sizeAuto')}</option>
                             <option value="small" data-i18n="sizeSmall">${Localization.get('sizeSmall')}</option>
                             <option value="large" data-i18n="sizeLarge">${Localization.get('sizeLarge')}</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <select class="position-select" aria-label="浮水印位置">
+                            <option value="auto" data-i18n="positionAuto">${Localization.get('positionAuto')}</option>
+                            <option value="new" data-i18n="positionNew">${Localization.get('positionNew')}</option>
+                            <option value="old" data-i18n="positionOld">${Localization.get('positionOld')}</option>
                         </select>
                     </div>
                     <div class="control-group slider-group">
@@ -350,7 +358,8 @@ class ImageProcessor {
         this.elements.canvas = card.querySelector('canvas');
         this.elements.ctx = this.elements.canvas.getContext('2d', { willReadFrequently: true });
         this.elements.loading = card.querySelector('.loading-overlay');
-        this.elements.sizeSelect = card.querySelector('select');
+        this.elements.sizeSelect = card.querySelector('.size-select');
+        this.elements.positionSelect = card.querySelector('.position-select');
         this.elements.alphaInput = card.querySelector('input[type="range"]');
         this.elements.alphaValue = card.querySelector('.alpha-value');
         this.elements.autoStrengthCheck = card.querySelector('.auto-strength-check');
@@ -363,6 +372,11 @@ class ImageProcessor {
         // Bind Events
         this.elements.sizeSelect.addEventListener('change', (e) => {
             this.config.forceMode = e.target.value;
+            this.processAndRender();
+        });
+
+        this.elements.positionSelect.addEventListener('change', (e) => {
+            this.config.forcePosition = e.target.value;
             this.processAndRender();
         });
 
@@ -496,6 +510,9 @@ class ImageProcessor {
         this.elements.card.querySelector('[data-i18n="sizeAuto"]').textContent = l.get('sizeAuto');
         this.elements.card.querySelector('[data-i18n="sizeSmall"]').textContent = l.get('sizeSmall');
         this.elements.card.querySelector('[data-i18n="sizeLarge"]').textContent = l.get('sizeLarge');
+        this.elements.card.querySelector('[data-i18n="positionAuto"]').textContent = l.get('positionAuto');
+        this.elements.card.querySelector('[data-i18n="positionNew"]').textContent = l.get('positionNew');
+        this.elements.card.querySelector('[data-i18n="positionOld"]').textContent = l.get('positionOld');
         this.elements.card.querySelector('[data-i18n="strengthLabel"]').textContent = l.get('strengthLabel');
         this.elements.card.querySelector('[data-i18n="autoLabel"]').textContent = l.get('autoLabel');
         this.elements.card.querySelector('[data-i18n="downloadBtn"]').textContent = l.get('downloadBtn');

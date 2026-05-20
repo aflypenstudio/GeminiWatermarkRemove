@@ -72,7 +72,7 @@ function removeWatermark(imageData, config) {
     }
 
     // 2. 智慧偵測浮水印區域
-    const region = selectWatermarkRegion(imageData, mask, mode);
+    const region = selectWatermarkRegion(imageData, mask, mode, config.forcePosition);
     if (!region) return null;
 
     const posX = region.x;
@@ -120,12 +120,20 @@ function removeWatermark(imageData, config) {
  * 依照新舊 Gemini 浮水印邊距候選值，選出最可能的浮水印區域。
  * 目前保留舊版 64/32px 邊距，同時支援新版 192/96px 邊距。
  */
-function selectWatermarkRegion(imageData, mask, mode) {
+function selectWatermarkRegion(imageData, mask, mode, forcePosition) {
     const w = imageData.width;
     const h = imageData.height;
-    const margins = mode === 'large'
-        ? [CONSTANTS.MARGIN_LARGE, CONSTANTS.MARGIN_LARGE_NEW]
-        : [CONSTANTS.MARGIN_SMALL, CONSTANTS.MARGIN_SMALL_NEW];
+    
+    let margins = [];
+    if (forcePosition === 'new') {
+        margins = [mode === 'large' ? CONSTANTS.MARGIN_LARGE_NEW : CONSTANTS.MARGIN_SMALL_NEW];
+    } else if (forcePosition === 'old') {
+        margins = [mode === 'large' ? CONSTANTS.MARGIN_LARGE : CONSTANTS.MARGIN_SMALL];
+    } else {
+        margins = mode === 'large'
+            ? [CONSTANTS.MARGIN_LARGE, CONSTANTS.MARGIN_LARGE_NEW]
+            : [CONSTANTS.MARGIN_SMALL, CONSTANTS.MARGIN_SMALL_NEW];
+    }
 
     const candidates = margins
         .map(margin => ({
@@ -139,6 +147,10 @@ function selectWatermarkRegion(imageData, mask, mode) {
         .filter(region => region.x >= 0 && region.y >= 0);
 
     if (candidates.length === 0) return null;
+
+    if (forcePosition && forcePosition !== 'auto') {
+        return candidates[0];
+    }
 
     for (const candidate of candidates) {
         candidate.score = scoreWatermarkCandidate(imageData, mask, candidate);
