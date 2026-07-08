@@ -40,7 +40,7 @@ const translations = {
         "positionAuto": "自動偵測位置",
         "positionNew": "新版邊距 (192px/96px)",
         "positionOld": "舊版邊距 (64px/32px)",
-        "resizeLabel": "自動縮小:",
+        "resizeLabel": "輸出縮小:",
         "resizeOff": "關閉縮小",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080"
