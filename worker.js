@@ -225,263 +225,277 @@ function scoreWatermarkCandidate(imageData, mask, region) {
 
 /**
  * 估算最佳的浮水印強度增益值 (alphaGain)
- * 使用多維度評估演算法，結合以下指標：
- * 1. 亮度一致性：水印區域內亮度的變異係數，越小越好
- * 2. 邊緣融合度：水印邊緣與背景的過渡是否自然
- * 3. 峰值檢測：處理後不應該有明顯的亮斑或暗斑
+ * 使用改良的直方圖分析 + 參考比對演算法
  *
- * 搜尋範圍：0.05 ~ 2.0，步进 0.01（200個候選值）
+ * 原理：
+ * 1. 分析水印區域的亮度分佈
+ * 2. 分析相鄰背景的亮度分佈
+ * 3. 找出水印的實際亮度值（白或黑）
+ * 4. 計算需要的增益值
  */
 function estimateOptimalGain(imageData, mask, posX, posY) {
     const data = imageData.data;
     const w = imageData.width;
     const h = imageData.height;
+    const stride = w * 4;
 
-    // 搜尋範圍：擴大到 0.05 ~ 2.0，精度提升到 0.01
-    const GAIN_MIN = 0.05;
-    const GAIN_MAX = 2.0;
-    const GAIN_STEP = 0.01;
+    // 收集水印區域的有效像素（包含座標）
+    const watermarkPixels = [];
+    const watermarkBrightness = [];
 
-    // 收集有效像素的位置（mask alpha > 0.05 的區域）
-    const validPositions = new Map(); // 用 Map 加速 index lookup
     for (let my = 0; my < mask.height; my++) {
         for (let mx = 0; mx < mask.width; mx++) {
-            if (mask.alphas[my * mask.width + mx] > 0.05) {
+            const alpha = mask.alphas[my * mask.width + mx];
+            if (alpha > 0.1) {
                 const ix = posX + mx;
                 const iy = posY + my;
                 if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
-                    const key = `${ix},${iy}`;
-                    validPositions.set(key, { mx, my, ix, iy });
+                    const idx = iy * stride + ix * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const brightness = r * 0.299 + g * 0.587 + b * 0.114;
+                    watermarkPixels.push({ x: ix, y: iy, r, g, b, brightness, alpha });
+                    watermarkBrightness.push(brightness);
                 }
             }
         }
     }
 
-    // 收集邊緣參考點（在水印區域邊緣外的像素，用於對比背景）
-    const edgeInfo = []; // { edgeX, edgeY, bgX, bgY } 用於記錄邊緣像素和其對應的背景像素
-    const backgroundPixels = []; // 純背景像素（用於對比邊緣融合度）
-    const edgeMargin = 10; // 從邊緣往外取的背景範圍
+    if (watermarkBrightness.length < 10) {
+        return 0.5;
+    }
 
-    // 四個方向
-    const directions = [
-        { dx: -1, dy: 0 },  // 左（往左取背景）
-        { dx: 1, dy: 0 },   // 右（往右取背景）
-        { dx: 0, dy: -1 },  // 上（往上取背景）
-        { dx: 0, dy: 1 }    // 下（往下取背景）
-    ];
+    // 收集背景像素
+    const backgroundPixels = [];
+    const sampleRange = 15;
+    const margin = 5;
 
-    for (let my = 0; my < mask.height; my++) {
-        for (let mx = 0; mx < mask.width; mx++) {
-            if (mask.alphas[my * mask.width + mx] > 0.05) {
-                const ix = posX + mx;
-                const iy = posY + my;
+    for (const px of watermarkPixels) {
+        const directions = [
+            { dx: -1, dy: 0 },
+            { dx: 1, dy: 0 },
+            { dx: 0, dy: -1 },
+            { dx: 0, dy: 1 }
+        ];
 
-                // 檢查是否是邊緣像素（至少一面是背景）
-                for (const dir of directions) {
-                    const nx = ix + dir.dx;
-                    const ny = iy + dir.dy;
-                    // 如果相鄰像素不在水印區域內，則是邊緣參考點
-                    const nxInMask = nx >= posX && nx < posX + mask.width && ny >= posY && ny < posY + mask.height;
-                    const nMaskIdx = (ny - posY) * mask.width + (nx - posX);
-                    if (!nxInMask || mask.alphas[nMaskIdx] <= 0.05) {
-                        if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
-                            // 從邊緣往外取真實背景像素
-                            for (let dist = 1; dist <= edgeMargin; dist++) {
-                                const bgX = ix + dir.dx * dist;
-                                const bgY = iy + dir.dy * dist;
-                                if (bgX >= 0 && bgX < w && bgY >= 0 && bgY < h) {
-                                    // 確保背景像素也不在水印區域內
-                                    const bgInMask = bgX >= posX && bgX < posX + mask.width && bgY >= posY && bgY < posY + mask.height;
-                                    const bgMaskIdx = bgInMask ? (bgY - posY) * mask.width + (bgX - posX) : -1;
-                                    if (!bgInMask || mask.alphas[bgMaskIdx] <= 0.05) {
-                                        edgeInfo.push({ edgeX: ix, edgeY: iy, bgX, bgY });
-                                        // 收集第一層背景像素
-                                        if (dist === 1) {
-                                            backgroundPixels.push({ x: bgX, y: bgY });
-                                        }
-                                        break; // 找到一個有效的背景就停止
-                                    }
-                                }
-                            }
-                        }
-                        break;
+        for (const dir of directions) {
+            for (let dist = margin; dist <= sampleRange; dist++) {
+                const bx = px.x + dir.dx * dist;
+                const by = px.y + dir.dy * dist;
+
+                // 確認在 image 範圍內且不在 mask 內
+                const inMask = bx >= posX && bx < posX + mask.width &&
+                               by >= posY && by < posY + mask.height;
+                if (inMask) {
+                    const mIdx = Math.round(by - posY) * mask.width + Math.round(bx - posX);
+                    if (mIdx >= 0 && mIdx < mask.alphas.length && mask.alphas[mIdx] > 0.1) {
+                        continue; // 仍在水印區域
                     }
                 }
+
+                if (bx >= 0 && bx < w && by >= 0 && by < h) {
+                    const idx = Math.round(by) * stride + Math.round(bx) * 4;
+                    const br = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+                    backgroundPixels.push(br);
+                    break;
+                }
             }
         }
     }
 
-    // 如果收集不到足夠的背景像素，從水印區域外的大範圍取樣
+    // 也從水印區域外的大範圍取樣背景
+    const outerMargin = Math.max(mask.width, mask.height) + 10;
+    for (let sy = Math.max(0, posY - outerMargin); sy < Math.min(h, posY + mask.height + outerMargin); sy += 20) {
+        for (let sx = Math.max(0, posX - outerMargin); sx < Math.min(w, posX + mask.width + outerMargin); sx += 20) {
+            const inMask = sx >= posX && sx < posX + mask.width && sy >= posY && sy < posY + mask.height;
+            if (!inMask) {
+                const idx = sy * stride + sx * 4;
+                backgroundPixels.push(data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114);
+            }
+        }
+    }
+
     if (backgroundPixels.length < 10) {
-        backgroundPixels.length = 0;
-        const sampleStep = 20;
-        const sampleMargin = Math.max(mask.width, mask.height) + edgeMargin + 5;
-        for (let sy = Math.max(0, posY - sampleMargin); sy < Math.min(h, posY + mask.height + sampleMargin); sy += sampleStep) {
-            for (let sx = Math.max(0, posX - sampleMargin); sx < Math.min(w, posX + mask.width + sampleMargin); sx += sampleStep) {
-                const inMask = sx >= posX && sx < posX + mask.width && sy >= posY && sy < posY + mask.height;
-                if (!inMask) {
-                    const mIdx = inMask ? (sy - posY) * mask.width + (sx - posX) : -1;
-                    if (!inMask || mask.alphas[mIdx] <= 0.05) {
-                        backgroundPixels.push({ x: sx, y: sy });
-                    }
-                }
-            }
+        return 0.5;
+    }
+
+    const wmStats = calculateStats(watermarkBrightness);
+    const bgStats = calculateStats(backgroundPixels);
+
+    // 決定水印類型
+    const brightnessDiff = wmStats.median - bgStats.median;
+    const isLightWatermark = brightnessDiff > 0;
+
+    // 根據水印類型和亮度差異估算初步增益
+    let estimatedGain = 0.5;
+    const p95 = percentile([...watermarkBrightness].sort((a, b) => a - b), 0.95);
+
+    if (isLightWatermark) {
+        const brightnessExcess = wmStats.median - bgStats.median;
+        if (brightnessExcess > 60 || p95 > bgStats.median + 80) {
+            estimatedGain = 0.25; // 水印很明顯亮
+        } else if (brightnessExcess > 40 || p95 > bgStats.median + 60) {
+            estimatedGain = 0.35;
+        } else if (brightnessExcess > 20 || p95 > bgStats.median + 40) {
+            estimatedGain = 0.5;
+        } else if (brightnessExcess > 10) {
+            estimatedGain = 0.65;
+        }
+    } else {
+        const brightnessDeficit = bgStats.median - wmStats.median;
+        if (brightnessDeficit > 60) {
+            estimatedGain = 0.2;
+        } else if (brightnessDeficit > 40) {
+            estimatedGain = 0.3;
+        } else if (brightnessDeficit > 20) {
+            estimatedGain = 0.45;
+        } else if (brightnessDeficit > 10) {
+            estimatedGain = 0.55;
         }
     }
 
-    // 兩階段搜尋策略：第一階段粗搜（0.1 間隔），第二階段細調（0.025 間隔）
-    let bestGain = 0.5;
+    // 細調：在估計值附近搜尋
+    const adjustedGain = fineTuneGain(imageData, mask, posX, posY, estimatedGain, watermarkPixels, backgroundPixels);
+
+    return parseFloat(Math.max(0.1, Math.min(1.5, adjustedGain)).toFixed(2));
+}
+
+/**
+ * 計算一組數值的統計資料
+ */
+function calculateStats(values) {
+    if (values.length === 0) return { mean: 0, median: 0, stdDev: 0, p25: 0, p75: 0 };
+
+    const sorted = [...values].sort((a, b) => a - b);
+    const n = sorted.length;
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    const mean = sum / n;
+
+    // 中位數
+    const median = n % 2 === 0
+        ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+        : sorted[Math.floor(n / 2)];
+
+    // 標準差
+    const variance = sorted.reduce((acc, val) => acc + (val - mean) ** 2, 0) / n;
+    const stdDev = Math.sqrt(variance);
+
+    // 四分位數
+    const p25 = percentile(sorted, 0.25);
+    const p75 = percentile(sorted, 0.75);
+
+    return { mean, median, stdDev, p25, p75 };
+}
+
+/**
+ * 計算百分位數
+ */
+function percentile(sortedValues, p) {
+    if (sortedValues.length === 0) return 0;
+    const index = (sortedValues.length - 1) * p;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    if (lower === upper) return sortedValues[lower];
+    return sortedValues[lower] + (sortedValues[upper] - sortedValues[lower]) * (index - lower);
+}
+
+/**
+ * 在估計值附近進行細調
+ * 返回最佳增益值
+ */
+function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, backgroundPixels) {
+    const data = imageData.data;
+    const w = imageData.width;
+    const h = imageData.height;
+    const stride = w * 4;
+
+    // 搜尋範圍：baseGain ± 0.25
+    const searchStart = Math.max(0.1, baseGain - 0.25);
+    const searchEnd = Math.min(1.5, baseGain + 0.25);
+    const step = 0.05;
+
+    let bestGain = baseGain;
     let bestScore = Number.NEGATIVE_INFINITY;
 
-    // 第一階段：粗搜 0.1 間隔
-    const roughScores = [];
-    for (let g = GAIN_MIN; g <= GAIN_MAX; g += 0.1) {
-        const scores = assessGain(imageData, mask, posX, posY, g, validPositions, edgeInfo, backgroundPixels, w, h);
-        // 統一性權重提高到 2.0，因為這是最重要的指標
-        const totalScore = scores.uniformity * 2.0 + scores.edgeBlend * 1.0 + scores.peak * 0.3;
-        roughScores.push({ gain: g, score: totalScore });
+    // 計算背景的平均亮度
+    const bgMean = backgroundPixels.reduce((a, b) => a + b, 0) / backgroundPixels.length;
+
+    for (let g = searchStart; g <= searchEnd; g += step) {
+        // 評估 gain 的效果：
+        // 理論上，處理後的水印區域亮度應該與背景接近
+        // 計算處理後所有水印像素與背景平均亮度的差異
+
+        let totalAbsDiff = 0;
+        let count = 0;
+
+        for (const px of watermarkPixels) {
+            if (px.alpha < 0.15) continue;
+
+            // 逆向 Alpha 混合（假設水印是亮的，LOGO_VALUE = 255）
+            const effectiveAlpha = Math.min(0.95, px.alpha * g);
+            const oneMinusAlpha = 1.0 - effectiveAlpha;
+            const idx = px.y * stride + px.x * 4;
+
+            const r = data[idx];
+            const gv = data[idx + 1];
+            const bv = data[idx + 2];
+
+            // 逆混合：original = (current - alpha * 255) / (1 - alpha)
+            const originalR = oneMinusAlpha > 0.01 ? (r - effectiveAlpha * 255) / oneMinusAlpha : r;
+            const originalG = oneMinusAlpha > 0.01 ? (gv - effectiveAlpha * 255) / oneMinusAlpha : gv;
+            const originalB = oneMinusAlpha > 0.01 ? (bv - effectiveAlpha * 255) / oneMinusAlpha : bv;
+            const originalBrightness = originalR * 0.299 + originalG * 0.587 + originalB * 0.114;
+
+            totalAbsDiff += Math.abs(originalBrightness - bgMean);
+            count++;
+        }
+
+        if (count === 0) continue;
+
+        const avgDiff = totalAbsDiff / count;
+
+        // 分數越高越好（處理後與背景越接近越好）
+        // 理想情況：avgDiff = 0，但考慮到 JPEG 壓縮等因素，5-15 的差異是可接受的
+        // 用高斯衰減：差異越小分數越高
+        const diffScore = Math.exp(-avgDiff / 20);
+
+        // 額外評估：處理後內部是否一致（標準差）
+        const correctedBrightnesses = [];
+        for (const px of watermarkPixels) {
+            if (px.alpha < 0.15) continue;
+            const effectiveAlpha = Math.min(0.95, px.alpha * g);
+            const oneMinusAlpha = 1.0 - effectiveAlpha;
+            const idx = px.y * stride + px.x * 4;
+            const br = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+            const corrBr = oneMinusAlpha > 0.01 ? (br - effectiveAlpha * 255) / oneMinusAlpha : br;
+            correctedBrightnesses.push(corrBr);
+        }
+
+        let uniformityScore = 0.5;
+        if (correctedBrightnesses.length > 1) {
+            const mean = correctedBrightnesses.reduce((a, b) => a + b, 0) / correctedBrightnesses.length;
+            const variance = correctedBrightnesses.reduce((acc, val) => acc + (val - mean) ** 2, 0) / correctedBrightnesses.length;
+            const stdDev = Math.sqrt(variance);
+            // 標準差越小越好（< 10 為理想）
+            uniformityScore = Math.max(0, 1 - stdDev / 30);
+        }
+
+        const totalScore = diffScore * 0.6 + uniformityScore * 0.4;
+
         if (totalScore > bestScore) {
             bestScore = totalScore;
             bestGain = g;
         }
     }
 
-    // 第二階段：在最佳粗搜點周圍細調（±0.2 範圍）
-    const fineStart = Math.max(GAIN_MIN, bestGain - 0.2);
-    const fineEnd = Math.min(GAIN_MAX, bestGain + 0.2);
-    for (let g = fineStart; g <= fineEnd; g += 0.025) {
-        const scores = assessGain(imageData, mask, posX, posY, g, validPositions, edgeInfo, backgroundPixels, w, h);
-        const totalScore = scores.uniformity * 2.0 + scores.edgeBlend * 1.0 + scores.peak * 0.3;
-        if (totalScore > bestScore) {
-            bestScore = totalScore;
-            bestGain = g;
-        }
-    }
-
-    // 確保回傳值在合理範圍內（0.1 ~ 1.5，常見的水印增益值）
-    if (bestGain < 0.1) bestGain = 0.1;
-    if (bestGain > 1.5) bestGain = 1.5;
-
-    return parseFloat(bestGain.toFixed(2));
+    return bestGain;
 }
 
 /**
  * 評估某個 gain 值的效果
  * 返回多維度評分
  */
-function assessGain(imageData, mask, posX, posY, gain, validPositions, edgeInfo, backgroundPixels, w, h) {
-    const data = imageData.data;
-    const logoValue = CONSTANTS.LOGO_VALUE;
-
-    // 建立有效位置的 lookup table 加速
-    const validLookup = new Set(validPositions.keys());
-
-    // 計算還原後的水印區域灰階值（使用 Map 避免重複計算）
-    const grayValuesMap = new Map();
-    for (const [key, pos] of validPositions) {
-        const mIdx = pos.my * mask.width + pos.mx;
-        let alpha = mask.alphas[mIdx] * gain;
-        if (alpha > CONSTANTS.MAX_ALPHA) alpha = CONSTANTS.MAX_ALPHA;
-        if (alpha < CONSTANTS.ALPHA_THRESHOLD) {
-            grayValuesMap.set(key, null);
-            continue;
-        }
-
-        const oneMinusAlpha = 1.0 - alpha;
-        const idx = (pos.iy * w + pos.ix) * 4;
-
-        const r = clamp8((data[idx] - alpha * logoValue) / oneMinusAlpha);
-        const gr = clamp8((data[idx + 1] - alpha * logoValue) / oneMinusAlpha);
-        const b = clamp8((data[idx + 2] - alpha * logoValue) / oneMinusAlpha);
-
-        const gray = r * 0.299 + gr * 0.587 + b * 0.114;
-        grayValuesMap.set(key, gray);
-    }
-
-    // 收集所有有效的灰階值用於統一性計算
-    const validGrays = [];
-    for (const gray of grayValuesMap.values()) {
-        if (gray !== null) validGrays.push(gray);
-    }
-
-    // 1. 評估亮度一致性（變異係數越小越好）
-    let uniformityScore = 0;
-    if (validGrays.length > 1) {
-        const mean = validGrays.reduce((a, b) => a + b, 0) / validGrays.length;
-        const variance = validGrays.reduce((sum, g) => sum + (g - mean) ** 2, 0) / validGrays.length;
-        const stdDev = Math.sqrt(variance);
-
-        // 變異係數 (CV) = 標準差 / 平均值
-        // CV 越小表示亮度越一致，水印消除越乾淨
-        // 轉換為評分：CV 越小分數越高
-        const cv = stdDev / (mean + 0.001);
-
-        // 使用 Sigmoid 函數轉換：理想 CV 應該越小越好
-        // 調整閾值到 0.15，對常見的水印更寬容
-        // CV < 0.15 = 高分，CV > 0.15 = 分數快速下降
-        uniformityScore = 1 / (1 + Math.exp((cv - 0.15) * 15));
-    }
-
-    // 2. 評估邊緣融合度（處理後的邊緣亮度應該與背景接近）
-    let edgeBlendScore = 0;
-    if (edgeInfo.length > 0 && backgroundPixels.length > 0) {
-        // 收集處理後的邊緣像素
-        const edgeProcessedGrays = [];
-        for (const info of edgeInfo) {
-            const key = `${info.edgeX},${info.edgeY}`;
-            const gray = grayValuesMap.get(key);
-            if (gray !== null && gray !== undefined) {
-                edgeProcessedGrays.push(gray);
-            }
-        }
-
-        // 收集真實背景像素的灰階值
-        const backgroundGrays = [];
-        for (const bgPos of backgroundPixels) {
-            const idx = (bgPos.y * w + bgPos.x) * 4;
-            const gray = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
-            backgroundGrays.push(gray);
-        }
-
-        if (edgeProcessedGrays.length > 0 && backgroundGrays.length > 0) {
-            const edgeMean = edgeProcessedGrays.reduce((a, b) => a + b, 0) / edgeProcessedGrays.length;
-            const bgMean = backgroundGrays.reduce((a, b) => a + b, 0) / backgroundGrays.length;
-
-            // 邊緣處理後的亮度應該接近背景
-            // 差異越小分數越高
-            const diff = Math.abs(edgeMean - bgMean);
-            edgeBlendScore = Math.exp(-diff / 30); // 高斯衰減
-        } else {
-            edgeBlendScore = 0.5; // 無法評估時給中等分
-        }
-    } else {
-        edgeBlendScore = 0.5;
-    }
-
-    // 3. 評估峰值（不應該有明顯的亮斑或暗斑）
-    let peakScore = 0;
-    if (validGrays.length > 0) {
-        // 使用中位數絕對偏差 (MAD) 來檢測異常值
-        const sorted = [...validGrays].sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
-        const absDevs = validGrays.map(g => Math.abs(g - median));
-        const mad = absDevs.reduce((a, b) => a + b, 0) / absDevs.length;
-
-        // 計算有多少像素偏離中位數超過 2 * MAD
-        const threshold = 2 * (mad + 0.001);
-        const peakCount = absDevs.filter(d => d > threshold).length;
-        const peakRatio = peakCount / validGrays.length;
-
-        // 峰值比例越小越好
-        peakScore = Math.exp(-peakRatio * 5);
-    }
-
-    return {
-        uniformity: uniformityScore,
-        edgeBlend: edgeBlendScore,
-        peak: peakScore
-    };
-}
 
 /**
  * 將浮點數限制在 0-255 範圍內
