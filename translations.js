@@ -54,10 +54,7 @@ const translations = {
         "sharpenLabel": "銳化",
         "fileNameTemplate": "檔名範本:",
         "fileNamePrefix": "前綴:",
-        "downloadClean": "純淨版",
-        "downloadLogo": "含 Logo 版",
-        "downloadBoth": "兩者都要",
-        "optionsTitle": "輸出選項"
+                "optionsTitle": "輸出選項"
     },
     "zh-CN": {
         "appTitle": "Gemini 水印去除器 & 自动缩小",
@@ -114,9 +111,7 @@ const translations = {
         "sharpenLabel": "锐化",
         "fileNameTemplate": "档名模板:",
         "fileNamePrefix": "前缀:",
-        "downloadClean": "纯净版",
-        "downloadLogo": "含 Logo 版",
-        "optionsTitle": "输出选项"
+                "optionsTitle": "输出选项"
     },
     "en": {
         "appTitle": "Gemini Watermark Remover & Auto Resize",
@@ -173,8 +168,6 @@ const translations = {
         "sharpenLabel": "Sharpen",
         "fileNameTemplate": "Filename:",
         "fileNamePrefix": "Prefix:",
-        "downloadClean": "Clean Only",
-        "downloadLogo": "With Logo",
         "optionsTitle": "Output Options"
     },
     "ja": {
@@ -232,8 +225,6 @@ const translations = {
         "sharpenLabel": "シャープ化",
         "fileNameTemplate": "ファイル名:",
         "fileNamePrefix": "接頭辞:",
-        "downloadClean": "クリーン版",
-        "downloadLogo": "ロゴ版",
         "optionsTitle": "出力オプション"
     },
     "ko": {
@@ -291,8 +282,6 @@ const translations = {
         "sharpenLabel": "선명화",
         "fileNameTemplate": "파일명:",
         "fileNamePrefix": "접두사:",
-        "downloadClean": "클린 버전",
-        "downloadLogo": "로고 포함",
         "optionsTitle": "출력 옵션"
     }
 };

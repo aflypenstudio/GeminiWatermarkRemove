@@ -30,7 +30,6 @@ const fileInput = document.getElementById('fileInput');
 const resultsContainer = document.getElementById('resultsContainer');
 const globalActions = document.getElementById('globalActions');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
-const downloadCleanBtn = document.getElementById('downloadCleanBtn');
 const batchProgress = document.getElementById('batchProgress');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
@@ -516,18 +515,12 @@ class ImageProcessor {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                    <div class="download-with-type" style="display: flex; flex: 1; gap: 0;">
-                        <select class="download-type-select" style="padding: 0.5rem 0.25rem; font-size: 0.75rem; border-radius: 0.5rem 0 0 0.5rem; min-width: 0; max-width: 90px;">
-                            <option value="logo">${Localization.get('downloadLogo') || '含 Logo'}</option>
-                            <option value="clean">${Localization.get('downloadClean') || '純淨版'}</option>
-                            <option value="both">${Localization.get('downloadBoth') || '兩者都要'}</option>
-                        </select>
-                        <button class="btn btn-primary download-btn" disabled style="border-radius: 0 0.5rem 0.5rem 0; padding: 0.5rem; flex: 1;">
+                    <button class="btn btn-primary download-btn" disabled style="border-radius: 0.5rem; padding: 0.5rem; flex: 1;">
                             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                             </svg>
                         </button>
-                    </div>
+                </div>
                 </div>
             </div>
             <div class="filename-display" title="${this.file.name}" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
@@ -546,8 +539,7 @@ class ImageProcessor {
         this.elements.alphaValue = card.querySelector('.alpha-value');
         this.elements.autoStrengthCheck = card.querySelector('.auto-strength-check');
         this.elements.downloadBtn = card.querySelector('.download-btn');
-        this.elements.downloadTypeSelect = card.querySelector('.download-type-select');
-        this.elements.removeBtn = card.querySelector('.remove-btn');
+                this.elements.removeBtn = card.querySelector('.remove-btn');
         this.elements.compareBtn = card.querySelector('.compare-btn');
         this.elements.wrapper = card.querySelector('.image-wrapper');
         this.elements.compareOverlay = card.querySelector('.comparison-overlay'); // Added ref
@@ -585,14 +577,7 @@ class ImageProcessor {
         });
 
         this.elements.downloadBtn.addEventListener('click', () => {
-            const type = this.elements.downloadTypeSelect ? this.elements.downloadTypeSelect.value : 'logo';
-            if (type === 'both') {
-                // 下載兩個版本
-                this.download(false); // 含 Logo
-                setTimeout(() => this.download(true), 300); // 純淨版
-            } else {
-                this.download(type === 'clean');
-            }
+            this.download();
         });
         this.elements.removeBtn.addEventListener('click', () => this.destroy());
 
@@ -850,27 +835,21 @@ class ImageProcessor {
 
     /**
      * 取得要下載的圖像資料
-     * @param {boolean} isClean - 是否為純淨版（不含 Logo）
      */
-    getImageForDownload(isClean) {
-        if (isClean) {
-            return this.state.cleanImageData || this.state.processedImageData;
-        }
+    getImageForDownload() {
         return this.state.processedImageData;
     }
 
     /**
      * 下載圖片
-     * @param {boolean} isClean - 是否為純淨版（不含 Logo）
      */
-    download(isClean = false) {
-        const imageData = this.getImageForDownload(isClean);
+    download() {
+        const imageData = this.getImageForDownload();
         if (!imageData) return;
 
         const format = STATE.downloadFormat;
         const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
         const ext = format === 'jpeg' ? '.jpg' : '.png';
-        const quality = format === 'jpeg' ? 0.85 : undefined;
 
         // 建立臨時 canvas 來處理圖片
         const tempCanvas = document.createElement('canvas');
@@ -882,7 +861,7 @@ class ImageProcessor {
         tempCtx.putImageData(imageData, 0, 0);
 
         // 應用銳化（如果啟用）
-        if (STATE.enableSharpen && !isClean) {
+        if (STATE.enableSharpen) {
             const sharpened = applySharpen(tempCanvas, tempCtx);
             tempCtx.putImageData(sharpened, 0, 0);
         }
@@ -924,21 +903,14 @@ class ImageProcessor {
             // 構建檔名
             const nameParts = this.file.name.split('.');
             nameParts.pop();
-            const w = outputCanvas.width;
-            const h = outputCanvas.height;
             const suffix = Localization.get('cleanSuffix') || '_clean';
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
 
-            // 方向前綴：横R / 豎S / 無Logo N
-            if (isClean) {
-                // 純淨版（去除浮水印、無 Logo）: N_圖片_clean.png
-                link.download = `${userPrefix}N_${nameParts.join('.')}${suffix}${ext}`;
-            } else {
-                // 含 Logo 版: R_圖片_clean.png / S_圖片_clean.png
-                const dirPrefix = w > h ? 'R_' : 'S_';
-                link.download = `${userPrefix}${dirPrefix}${nameParts.join('.')}${suffix}${ext}`;
-            }
+            // 方向前綴：横R / 豎S
+            const w = outputCanvas.width;
+            const dirPrefix = w > outputCanvas.height ? 'R_' : 'S_';
+            link.download = `${userPrefix}${dirPrefix}${nameParts.join('.')}${suffix}${ext}`;
 
             link.href = url;
             link.click();
@@ -1058,15 +1030,12 @@ window.addEventListener('paste', (e) => {
 
 /**
  * 批次下載所有圖片
- * @param {boolean} isClean - 是否為純淨版（不含 Logo）
  */
-async function downloadAll(isClean = false) {
+async function downloadAll() {
     if (STATE.processors.length === 0) return;
 
     // 禁用按鈕並顯示進度條
-    const btn = isClean ? downloadCleanBtn : downloadAllBtn;
-    const folderName = isClean ? 'gemini_clean_only' : 'gemini_with_logo';
-
+    const btn = downloadAllBtn;
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = `<span>${Localization.get('progressLabel') || '處理中...'}</span>`;
@@ -1078,7 +1047,7 @@ async function downloadAll(isClean = false) {
         let delay = 0;
         STATE.processors.forEach((p, i) => {
             setTimeout(() => {
-                p.download(isClean);
+                p.download();
                 updateProgress(i + 1, STATE.processors.length);
             }, delay);
             delay += 500;
@@ -1086,9 +1055,8 @@ async function downloadAll(isClean = false) {
         setTimeout(() => {
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = isClean
-                    ? '<span data-i18n="downloadClean">純淨版</span>'
-                    : '<span data-i18n="downloadAll">含 Logo 版</span>';
+                btn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg><span data-i18n="downloadAll">下載全部</span>`;
+                Localization.apply();
             }
             if (batchProgress) batchProgress.style.display = 'none';
             Localization.apply();
@@ -1097,7 +1065,7 @@ async function downloadAll(isClean = false) {
     }
 
     const zip = new JSZip();
-    const folder = zip.folder(folderName);
+    const folder = zip.folder('banana_clean');
     const usedNames = new Set();
 
     try {
@@ -1105,7 +1073,7 @@ async function downloadAll(isClean = false) {
         const completed = { count: 0 };
 
         const promises = STATE.processors.map(p => new Promise(async (resolve) => {
-            const imageData = p.getImageForDownload(isClean);
+            const imageData = p.getImageForDownload();
             if (!imageData) {
                 updateProgress(++completed.count, total);
                 resolve(false);
@@ -1115,7 +1083,6 @@ async function downloadAll(isClean = false) {
             const format = STATE.downloadFormat;
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const ext = format === 'jpeg' ? '.jpg' : '.png';
-            const quality = format === 'jpeg' ? 0.85 : undefined;
 
             // 建立臨時 canvas
             const tempCanvas = document.createElement('canvas');
@@ -1125,7 +1092,7 @@ async function downloadAll(isClean = false) {
             tempCtx.putImageData(imageData, 0, 0);
 
             // 銳化（如果啟用）
-            if (STATE.enableSharpen && !isClean) {
+            if (STATE.enableSharpen) {
                 const sharpened = applySharpen(tempCanvas, tempCtx);
                 tempCtx.putImageData(sharpened, 0, 0);
             }
@@ -1154,13 +1121,12 @@ async function downloadAll(isClean = false) {
             // 構建檔名
             const nameParts = p.file.name.split('.');
             nameParts.pop();
-            const suffix = isClean ? '' : (Localization.get('cleanSuffix') || '_clean');
+            const suffix = Localization.get('cleanSuffix') || '_clean';
             let filename = `${nameParts.join('.')}${suffix}${ext}`;
 
             if (usedNames.has(filename)) {
                 let counter = 1;
                 const basePart = filename.substring(0, filename.lastIndexOf(suffix));
-                const extStart = filename.lastIndexOf(ext);
                 while (usedNames.has(filename)) {
                     filename = `${basePart}_${counter}${suffix}${ext}`;
                     counter++;
@@ -1169,9 +1135,8 @@ async function downloadAll(isClean = false) {
             usedNames.add(filename);
 
             const fw = outputCanvas.width;
-            const fh = outputCanvas.height;
-            // 橫R / 豎S / 無Logo N
-            const dirPrefix = isClean ? 'N_' : (fw > fh ? 'R_' : 'S_');
+            // 橫R / 豎S
+            const dirPrefix = fw > outputCanvas.height ? 'R_' : 'S_';
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
             filename = `${userPrefix}${dirPrefix}${filename}`;
@@ -1188,7 +1153,7 @@ async function downloadAll(isClean = false) {
         const content = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(content);
         const link = document.createElement('a');
-        link.download = `gemini_${folderName}_${Date.now()}.zip`;
+        link.download = `banana_watermark_remover_${Date.now()}.zip`;
         link.href = url;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -1197,13 +1162,11 @@ async function downloadAll(isClean = false) {
         console.error('ZIP generation failed:', err);
         alert('建立 ZIP 失敗，已改為個別下載。');
         // 降級到依序下載
-        STATE.processors.forEach(p => p.download(isClean));
+        STATE.processors.forEach(p => p.download());
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = isClean
-                ? `<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg><span data-i18n="downloadClean">純淨版</span>`
-                : `<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg><span data-i18n="downloadAll">含 Logo 版</span>`;
+            btn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg><span data-i18n="downloadAll">下載全部</span>`;
             Localization.apply();
         }
         if (batchProgress) batchProgress.style.display = 'none';
@@ -1226,13 +1189,8 @@ function updateProgress(current, total) {
     progressText.textContent = `${current}/${total} (${pct}%)`;
 }
 
-// 按鈕事件：含 Logo 版下載（點擊卡片下載按鈕也走這條）
-downloadAllBtn.addEventListener('click', () => downloadAll(false));
-
-// 按鈕事件：純淨版下載（需要確保元素存在）
-if (downloadCleanBtn) {
-    downloadCleanBtn.addEventListener('click', () => downloadAll(true));
-}
+// 按鈕事件：下載全部
+downloadAllBtn.addEventListener('click', () => downloadAll());
 
 function reprocessAllImages() {
     STATE.processors.forEach(p => {
