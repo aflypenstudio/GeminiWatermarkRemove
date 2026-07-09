@@ -1137,23 +1137,37 @@ function updateUIState() {
     }
 }
 
-// Drag & Drop
+// Drag & Drop - on dropZone
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     dropZone.classList.add('drag-over');
-    // Optional: update text to "Released to Upload"
 });
 
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('drag-over');
+dropZone.addEventListener('dragleave', (e) => {
+    // Only remove if we're actually leaving the dropZone (not entering a child)
+    if (!dropZone.contains(e.relatedTarget)) {
+        dropZone.classList.remove('drag-over');
+    }
 });
 
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     dropZone.classList.remove('drag-over');
-    if (e.dataTransfer.files.length > 0) {
-        handleFiles(e.dataTransfer.files);
+    const files = e.dataTransfer ? e.dataTransfer.files : null;
+    if (files && files.length > 0) {
+        handleFiles(files);
     }
+});
+
+// Also listen on document level to catch drops anywhere on the page
+document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+});
+
+document.addEventListener('drop', (e) => {
+    e.preventDefault();
 });
 
 
