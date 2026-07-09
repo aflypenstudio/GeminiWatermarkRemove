@@ -243,31 +243,31 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
     const GAIN_STEP = 0.01;
 
     // 收集有效像素的位置（mask alpha > 0.05 的區域）
-    const validPositions = [];
+    const validPositions = new Map(); // 用 Map 加速 index lookup
     for (let my = 0; my < mask.height; my++) {
         for (let mx = 0; mx < mask.width; mx++) {
             if (mask.alphas[my * mask.width + mx] > 0.05) {
                 const ix = posX + mx;
                 const iy = posY + my;
                 if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
-                    validPositions.push({ mx, my, ix, iy });
+                    const key = `${ix},${iy}`;
+                    validPositions.set(key, { mx, my, ix, iy });
                 }
             }
         }
     }
 
     // 收集邊緣參考點（在水印區域邊緣外的像素，用於對比背景）
-    const edgePositions = [];
-    const edgeMargin = 5; // 邊緣參考的範圍
-    const maskCenterX = posX + mask.width / 2;
-    const maskCenterY = posY + mask.height / 2;
+    const edgeInfo = []; // { edgeX, edgeY, bgX, bgY } 用於記錄邊緣像素和其對應的背景像素
+    const backgroundPixels = []; // 純背景像素（用於對比邊緣融合度）
+    const edgeMargin = 10; // 從邊緣往外取的背景範圍
 
-    // 收集四個方向的邊緣背景像素
+    // 四個方向
     const directions = [
-        { dx: -1, dy: 0 },  // 左
-        { dx: 1, dy: 0 },   // 右
-        { dx: 0, dy: -1 },  // 上
-        { dx: 0, dy: 1 }    // 下
+        { dx: -1, dy: 0 },  // 左（往左取背景）
+        { dx: 1, dy: 0 },   // 右（往右取背景）
+        { dx: 0, dy: -1 },  // 上（往上取背景）
+        { dx: 0, dy: 1 }    // 下（往下取背景）
     ];
 
     for (let my = 0; my < mask.height; my++) {
@@ -284,10 +284,45 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
                     const nxInMask = nx >= posX && nx < posX + mask.width && ny >= posY && ny < posY + mask.height;
                     const nMaskIdx = (ny - posY) * mask.width + (nx - posX);
                     if (!nxInMask || mask.alphas[nMaskIdx] <= 0.05) {
-                        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-                            edgePositions.push({ x: ix, y: iy });
+                        if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
+                            // 從邊緣往外取真實背景像素
+                            for (let dist = 1; dist <= edgeMargin; dist++) {
+                                const bgX = ix + dir.dx * dist;
+                                const bgY = iy + dir.dy * dist;
+                                if (bgX >= 0 && bgX < w && bgY >= 0 && bgY < h) {
+                                    // 確保背景像素也不在水印區域內
+                                    const bgInMask = bgX >= posX && bgX < posX + mask.width && bgY >= posY && bgY < posY + mask.height;
+                                    const bgMaskIdx = bgInMask ? (bgY - posY) * mask.width + (bgX - posX) : -1;
+                                    if (!bgInMask || mask.alphas[bgMaskIdx] <= 0.05) {
+                                        edgeInfo.push({ edgeX: ix, edgeY: iy, bgX, bgY });
+                                        // 收集第一層背景像素
+                                        if (dist === 1) {
+                                            backgroundPixels.push({ x: bgX, y: bgY });
+                                        }
+                                        break; // 找到一個有效的背景就停止
+                                    }
+                                }
+                            }
                         }
                         break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果收集不到足夠的背景像素，從水印區域外的大範圍取樣
+    if (backgroundPixels.length < 10) {
+        backgroundPixels.length = 0;
+        const sampleStep = 20;
+        const sampleMargin = Math.max(mask.width, mask.height) + edgeMargin + 5;
+        for (let sy = Math.max(0, posY - sampleMargin); sy < Math.min(h, posY + mask.height + sampleMargin); sy += sampleStep) {
+            for (let sx = Math.max(0, posX - sampleMargin); sx < Math.min(w, posX + mask.width + sampleMargin); sx += sampleStep) {
+                const inMask = sx >= posX && sx < posX + mask.width && sy >= posY && sy < posY + mask.height;
+                if (!inMask) {
+                    const mIdx = inMask ? (sy - posY) * mask.width + (sx - posX) : -1;
+                    if (!inMask || mask.alphas[mIdx] <= 0.05) {
+                        backgroundPixels.push({ x: sx, y: sy });
                     }
                 }
             }
@@ -299,8 +334,8 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
 
     // 搜尋每個候選 gain
     for (let g = GAIN_MIN; g <= GAIN_MAX; g += GAIN_STEP) {
-        const scores = assessGain(imageData, mask, posX, posY, g, validPositions, edgePositions, w, h);
-        const totalScore = scores.uniformity + scores.edgeBlend + scores.peak * 0.5;
+        const scores = assessGain(imageData, mask, posX, posY, g, validPositions, edgeInfo, backgroundPixels, w, h);
+        const totalScore = scores.uniformity + scores.edgeBlend * 1.5 + scores.peak * 0.5;
 
         if (totalScore > bestScore) {
             bestScore = totalScore;
@@ -315,18 +350,21 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
  * 評估某個 gain 值的效果
  * 返回多維度評分
  */
-function assessGain(imageData, mask, posX, posY, gain, validPositions, edgePositions, w, h) {
+function assessGain(imageData, mask, posX, posY, gain, validPositions, edgeInfo, backgroundPixels, w, h) {
     const data = imageData.data;
     const logoValue = CONSTANTS.LOGO_VALUE;
 
-    // 計算還原後的水印區域灰階值
-    const grayValues = [];
-    for (const pos of validPositions) {
+    // 建立有效位置的 lookup table 加速
+    const validLookup = new Set(validPositions.keys());
+
+    // 計算還原後的水印區域灰階值（使用 Map 避免重複計算）
+    const grayValuesMap = new Map();
+    for (const [key, pos] of validPositions) {
         const mIdx = pos.my * mask.width + pos.mx;
         let alpha = mask.alphas[mIdx] * gain;
         if (alpha > CONSTANTS.MAX_ALPHA) alpha = CONSTANTS.MAX_ALPHA;
         if (alpha < CONSTANTS.ALPHA_THRESHOLD) {
-            grayValues.push(null); // 跳過透明區域
+            grayValuesMap.set(key, null);
             continue;
         }
 
@@ -338,11 +376,16 @@ function assessGain(imageData, mask, posX, posY, gain, validPositions, edgePosit
         const b = clamp8((data[idx + 2] - alpha * logoValue) / oneMinusAlpha);
 
         const gray = r * 0.299 + gr * 0.587 + b * 0.114;
-        grayValues.push(gray);
+        grayValuesMap.set(key, gray);
+    }
+
+    // 收集所有有效的灰階值用於統一性計算
+    const validGrays = [];
+    for (const gray of grayValuesMap.values()) {
+        if (gray !== null) validGrays.push(gray);
     }
 
     // 1. 評估亮度一致性（變異係數越小越好）
-    const validGrays = grayValues.filter(g => g !== null);
     let uniformityScore = 0;
     if (validGrays.length > 1) {
         const mean = validGrays.reduce((a, b) => a + b, 0) / validGrays.length;
@@ -359,22 +402,23 @@ function assessGain(imageData, mask, posX, posY, gain, validPositions, edgePosit
         uniformityScore = 1 / (1 + Math.exp((cv - 0.05) * 20));
     }
 
-    // 2. 評估邊緣融合度（處理後的亮度應該與背景接近）
+    // 2. 評估邊緣融合度（處理後的邊緣亮度應該與背景接近）
     let edgeBlendScore = 0;
-    if (edgePositions.length > 0) {
-        // 收集處理後的水印邊緣像素
+    if (edgeInfo.length > 0 && backgroundPixels.length > 0) {
+        // 收集處理後的邊緣像素
         const edgeProcessedGrays = [];
-        for (const pos of validPositions) {
-            const inEdgeList = edgePositions.some(e => e.x === pos.ix && e.y === pos.iy);
-            if (inEdgeList && grayValues[validPositions.indexOf(pos)] !== null) {
-                edgeProcessedGrays.push(grayValues[validPositions.indexOf(pos)]);
+        for (const info of edgeInfo) {
+            const key = `${info.edgeX},${info.edgeY}`;
+            const gray = grayValuesMap.get(key);
+            if (gray !== null && gray !== undefined) {
+                edgeProcessedGrays.push(gray);
             }
         }
 
-        // 收集邊緣外的背景像素（從水印中心向外延伸）
+        // 收集真實背景像素的灰階值
         const backgroundGrays = [];
-        for (const pos of edgePositions) {
-            const idx = (pos.y * w + pos.x) * 4;
+        for (const bgPos of backgroundPixels) {
+            const idx = (bgPos.y * w + bgPos.x) * 4;
             const gray = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
             backgroundGrays.push(gray);
         }
