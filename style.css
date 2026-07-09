@@ -300,7 +300,7 @@ body.has-files .app-card {
 }
 
 .drop-zone:hover,
-.drop-zone.dragover {
+.drop-zone.drag-over {
   border-color: #7c3aed;
   background-color: rgba(124, 58, 237, 0.05);
 }
