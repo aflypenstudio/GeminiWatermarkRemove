@@ -2,9 +2,6 @@ const translations = {
     "zh-TW": {
         "appTitle": "巴娜娜水印&微調器",
         "appSubtitle": "使用逆向 Alpha 混合技術去除 Gemini 生成圖片中的可見浮水印。",
-        "featureFree": "✨ 免費快速",
-        "featureLocal": "💻 不佔資源",
-        "featureQuality": "🖼️ 保持原圖解析度",
         "downloadAll": "全部下載 (ZIP)",
         "logoTitle": "🎨 自訂 Logo（選填）",
         "clearLogo": "清除 Logo",
@@ -60,9 +57,6 @@ const translations = {
     "zh-CN": {
         "appTitle": "Gemini 水印去除器 & 自动缩小",
         "appSubtitle": "使用逆向 Alpha 混合技术去除 Gemini 生成图片中的可见水印。",
-        "featureFree": "✨ 免费快速",
-        "featureLocal": "💻 不占资源",
-        "featureQuality": "🖼️ 保持原图分辨率",
         "downloadAll": "全部下载 (ZIP)",
         "logoTitle": "🎨 自定义 Logo（选填）",
         "clearLogo": "清除 Logo",
@@ -118,9 +112,6 @@ const translations = {
     "en": {
         "appTitle": "Gemini Watermark Remover & Auto Resize",
         "appSubtitle": "Remove visible watermarks from Gemini-generated images using reverse Alpha blending.",
-        "featureFree": "✨ Free & Fast",
-        "featureLocal": "💻 Client-side Processing",
-        "featureQuality": "🖼️ Original Quality Kept",
         "downloadAll": "Download All (ZIP)",
         "logoTitle": "🎨 Custom Logo (Optional)",
         "clearLogo": "Clear Logo",
@@ -176,9 +167,6 @@ const translations = {
     "ja": {
         "appTitle": "Gemini 透かし除去ツール & 自動リサイズ",
         "appSubtitle": "逆アルファブレンド技術を使用して、Gemini生成画像から透かしを除去します。",
-        "featureFree": "✨ 無料＆高速",
-        "featureLocal": "💻 ローカル処理",
-        "featureQuality": "🖼️ 元の画質を維持",
         "downloadAll": "すべてダウンロード (ZIP)",
         "logoTitle": "🎨 カスタムロゴ（任意）",
         "clearLogo": "ロゴを削除",
@@ -234,9 +222,6 @@ const translations = {
     "ko": {
         "appTitle": "Gemini 워터마크 제거기 & 자동 크기调整",
         "appSubtitle": "역 알파 블렌딩 기술을 사용하여 Gemini 생성 이미지에서 워터마크를 제거합니다.",
-        "featureFree": "✨ 무료 & 빠른 속도",
-        "featureLocal": "💻 로컬 처리",
-        "featureQuality": "🖼️ 원본 화질 유지",
         "downloadAll": "모두 다운로드 (ZIP)",
         "logoTitle": "🎨 사용자 지정 로고 (선택 사항)",
         "clearLogo": "로고 지우기",
