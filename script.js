@@ -952,6 +952,9 @@ function handleFiles(fileList) {
     // Reset file input so same file can be selected again if needed
     fileInput.value = '';
 
+    // 新檔案加入時自動套用排序
+    applySort();
+
     updateUIState();
 }
 
@@ -1254,33 +1257,36 @@ if (filenamePrefixInput) {
 // 圖片排序功能
 // =============================================================================
 
-function applySort() {
-    const sortBy = STATE.sortBy;
-    const sortOrder = STATE.sortOrder;
+function applySort(andReorder = true) {
+    // 直接從 DOM 讀取最新值
+    const sortByField = sortBySelect ? sortBySelect.value : STATE.sortBy;
+    const sortOrderField = sortOrderSelect ? sortOrderSelect.value : STATE.sortOrder;
 
     STATE.processors.sort((a, b) => {
         let valA, valB;
-        if (sortBy === 'name') {
+        if (sortByField === 'name') {
             valA = a.file.name.toLowerCase();
             valB = b.file.name.toLowerCase();
         } else {
-            // 依時間：使用 lastModified 或 Date.now()
+            // 依時間：使用 lastModified
             valA = a.file.lastModified || 0;
             valB = b.file.lastModified || 0;
         }
 
-        if (sortOrder === 'asc') {
+        if (sortOrderField === 'asc') {
             return valA < valB ? -1 : (valA > valB ? 1 : 0);
         } else {
             return valA > valB ? -1 : (valA < valB ? 1 : 0);
         }
     });
 
-    // 重新渲染順序（移除並重新加入 DOM）
-    resultsContainer.innerHTML = '';
-    STATE.processors.forEach(p => {
-        resultsContainer.appendChild(p.elements.card);
-    });
+    // 重新渲染順序
+    if (andReorder) {
+        resultsContainer.innerHTML = '';
+        STATE.processors.forEach(p => {
+            resultsContainer.appendChild(p.elements.card);
+        });
+    }
 }
 
 // 排序設定事件
