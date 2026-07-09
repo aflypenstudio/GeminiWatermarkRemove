@@ -825,7 +825,7 @@ class ImageProcessor {
         const scaledWidth = logo.width * scale;
         const scaledHeight = logo.height * scale;
 
-        // 計算位置：跟随水印区域
+        // 計算位置：LOGO 中心點對齐水印中心點
         let posX, posY;
         const watermarkRegion = this.state.watermarkRegion;
 
@@ -836,9 +836,11 @@ class ImageProcessor {
             const scaleX = w / originalW;
             const scaleY = h / originalH;
 
-            // LOGO 放在水印区域的起始位置（会覆盖水印区域）
-            posX = watermarkRegion.x * scaleX;
-            posY = watermarkRegion.y * scaleY;
+            // LOGO 中心點對齐水印中心點
+            const watermarkCenterX = (watermarkRegion.x + watermarkRegion.width / 2) * scaleX;
+            const watermarkCenterY = (watermarkRegion.y + watermarkRegion.height / 2) * scaleY;
+            posX = watermarkCenterX - scaledWidth / 2;
+            posY = watermarkCenterY - scaledHeight / 2;
         } else {
             // 備用：放在右下角
             const margin = shortSide * 0.02;
@@ -887,14 +889,16 @@ class ImageProcessor {
         const scaledWidth = logo.width * scale;
         const scaledHeight = logo.height * scale;
 
-        // 計算位置：跟随水印区域
+        // 計算位置：LOGO 中心點對齐水印中心點
         let posX, posY;
         const watermarkRegion = this.state.watermarkRegion;
 
         if (watermarkRegion && watermarkRegion.x !== undefined) {
-            // 使用水印位置
-            posX = watermarkRegion.x;
-            posY = watermarkRegion.y;
+            // LOGO 中心點對齐水印中心點
+            const watermarkCenterX = watermarkRegion.x + watermarkRegion.width / 2;
+            const watermarkCenterY = watermarkRegion.y + watermarkRegion.height / 2;
+            posX = watermarkCenterX - scaledWidth / 2;
+            posY = watermarkCenterY - scaledHeight / 2;
         } else {
             // 備用：放在右下角
             const margin = shortSide * 0.02;
