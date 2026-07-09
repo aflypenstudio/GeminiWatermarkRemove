@@ -11,8 +11,8 @@ const STATE = {
     processors: [], // Store active ImageProcessor instances
     customLogo: {
         image: null,     // HTMLImageElement - 使用者上傳的 Logo 圖片
-        opacity: 0.8,    // 0.0 ~ 1.0 - Logo 透明度
-        scale: 1.0       // 0.1 ~ 3.0 - Logo 縮放比例 (預設 1.0)
+        opacity: 0.2,    // 0.0 ~ 1.0 - Logo 透明度
+        scale: 2.0       // 0.1 ~ 3.0 - Logo 縮放比例 (預設 2.0)
     },
     downloadFormat: 'png', // 'png' or 'jpeg' - 全域下載格式設定
     resizePreset: '1280x720', // '' | '1280x720' | '1920x1080' - 自動縮小預設尺寸
@@ -795,7 +795,54 @@ class ImageProcessor {
     }
 
     /**
-     * 疊加自訂 Logo 到圖片右下角
+     * 疊加自訂 Logo 到指定 canvas 右下角
+     * Logo 會自動縮放以配合 canvas 比例，並套用透明度
+     * 大小基於 canvas 寬度的 3%~15%（scale 10%~300% 對應此範圍）
+     */
+    applyCustomLogoToCanvas(targetCanvas) {
+        if (!STATE.customLogo.image) return;
+
+        const ctx = targetCanvas.getContext('2d');
+        const logo = STATE.customLogo.image;
+        const opacity = STATE.customLogo.opacity;
+
+        const w = targetCanvas.width;
+        const h = targetCanvas.height;
+        const userScale = STATE.customLogo.scale; // 0.1 ~ 3.0
+
+        // 基於目標 canvas 寬度計算 Logo 大小
+        // scale 10%  → canvas 寬度 3%
+        // scale 100% → canvas 寬度 5%
+        // scale 300% → canvas 寬度 15%
+        const minPercent = 0.03;  // 最低 3% 圖寬
+        const maxPercent = 0.15;  // 最高 15% 圖寬
+        const percentRange = maxPercent - minPercent;
+
+        // 將 scale 0.1~3.0 映射到 minPercent~maxPercent
+        const logoPercent = minPercent + percentRange * ((userScale - 0.1) / 2.9);
+        const targetSize = w * logoPercent;
+
+        // 計算縮放比例（保持寬高比，以 targetSize 為最大邊）
+        const scale = Math.min(targetSize / logo.width, targetSize / logo.height);
+        const scaledWidth = logo.width * scale;
+        const scaledHeight = logo.height * scale;
+
+        // 計算位置（右下角，間距為 canvas 寬的 2%）
+        const margin = w * 0.02;
+        const posX = w - margin - scaledWidth;
+        const posY = h - margin - scaledHeight;
+
+        if (posX < 0 || posY < 0) return;
+
+        // 繪製 Logo
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.drawImage(logo, posX, posY, scaledWidth, scaledHeight);
+        ctx.restore();
+    }
+
+    /**
+     * 疊加自訂 Logo 到圖片右下角（舊方法，用於 UI 預覽）
      * Logo 會自動縮放以配合圖片比例，並套用透明度
      * 大小基於原圖寬度的 3%~15%（scale 10%~300% 對應此範圍）
      */
@@ -867,8 +914,11 @@ class ImageProcessor {
         tempCanvas.height = imageData.height;
         const tempCtx = tempCanvas.getContext('2d');
 
-        // 繪製 ImageData
-        tempCtx.putImageData(imageData, 0, 0);
+        // 取得乾淨版本（不含 LOGO）的 ImageData
+        const cleanImageData = this.state.cleanImageData || imageData;
+
+        // 繪製 ImageData（使用不含 LOGO 的乾淨版本）
+        tempCtx.putImageData(noLogo ? cleanImageData : imageData, 0, 0);
 
         // 應用銳化（如果啟用）
         if (STATE.enableSharpen) {
@@ -880,7 +930,7 @@ class ImageProcessor {
         let outputCanvas = tempCanvas;
         const preset = STATE.resizePreset;
         if (preset) {
-            const isLandscape = outputCanvas.width > outputCanvas.height;
+            const isLandscape = imageData.width > imageData.height;
             let targetW, targetH;
 
             if (preset === '1920x1080') {
@@ -895,8 +945,13 @@ class ImageProcessor {
             resizedCanvas.width = targetW;
             resizedCanvas.height = targetH;
             const ctx = resizedCanvas.getContext('2d');
-            ctx.drawImage(outputCanvas, 0, 0, targetW, targetH);
+            ctx.drawImage(tempCanvas, 0, 0, targetW, targetH);
             outputCanvas = resizedCanvas;
+        }
+
+        // 如果需要且有自訂 LOGO，在縮放後的 canvas 上套用 LOGO（基於縮放後尺寸計算位置）
+        if (!noLogo && STATE.customLogo.image) {
+            this.applyCustomLogoToCanvas(outputCanvas);
         }
 
         // 取得 EXIF 資料（僅 JPEG + 保留 EXIF 選項）
@@ -1101,6 +1156,7 @@ async function downloadAll() {
 
         const promises = STATE.processors.map(p => new Promise(async (resolve) => {
             const imageData = p.getImageForDownload();
+            const cleanImageData = p.state.cleanImageData;
             if (!imageData) {
                 updateProgress(completed.count += hasLogo ? 2 : 1, total);
                 resolve(false);
@@ -1111,40 +1167,6 @@ async function downloadAll() {
             const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
             const ext = format === 'jpeg' ? '.jpg' : '.png';
 
-            // 建立臨時 canvas
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = imageData.width;
-            tempCanvas.height = imageData.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(imageData, 0, 0);
-
-            // 銳化（如果啟用）
-            if (STATE.enableSharpen) {
-                const sharpened = applySharpen(tempCanvas, tempCtx);
-                tempCtx.putImageData(sharpened, 0, 0);
-            }
-
-            // 縮放
-            let outputCanvas = tempCanvas;
-            const preset = STATE.resizePreset;
-            if (preset) {
-                const isLandscape = outputCanvas.width > outputCanvas.height;
-                let targetW = isLandscape ? 1920 : 1080;
-                let targetH = isLandscape ? 1080 : 1920;
-                if (preset === '1280x720') {
-                    targetW = isLandscape ? 1280 : 720;
-                    targetH = isLandscape ? 720 : 1280;
-                }
-                const resized = document.createElement('canvas');
-                resized.width = targetW;
-                resized.height = targetH;
-                resized.getContext('2d').drawImage(outputCanvas, 0, 0, targetW, targetH);
-                outputCanvas = resized;
-            }
-
-            // EXIF
-            const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
 
@@ -1154,87 +1176,117 @@ async function downloadAll() {
             const suffix = Localization.get('cleanSuffix') || '_clean';
             const baseFilename = `${nameParts.join('.')}${suffix}${ext}`;
 
-            // 橫R / 豎S（前綴）
-            const fw = outputCanvas.width;
-            const dirPrefix = fw > outputCanvas.height ? 'R_' : 'S_';
+            // 縮放設定
+            const preset = STATE.resizePreset;
+            const isLandscape = imageData.width > imageData.height;
 
-            // 處理含 Logo 版本（R_/S_）
-            const logoFilename = (() => {
-                let filename = `${baseFilename}`;
+            // 構建含 Logo 版本（R_/S_）
+            {
+                // 使用含 LOGO 的版本，在縮放後的 canvas 上套用 LOGO（基於縮放後尺寸）
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = imageData.width;
+                tempCanvas.height = imageData.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(imageData, 0, 0);
+
+                // 銳化（如果啟用）
+                if (STATE.enableSharpen) {
+                    const sharpened = applySharpen(tempCanvas, tempCtx);
+                    tempCtx.putImageData(sharpened, 0, 0);
+                }
+
+                // 縮放
+                let outputCanvas = tempCanvas;
+                if (preset) {
+                    let targetW = isLandscape ? 1920 : 1080;
+                    let targetH = isLandscape ? 1080 : 1920;
+                    if (preset === '1280x720') {
+                        targetW = isLandscape ? 1280 : 720;
+                        targetH = isLandscape ? 720 : 1280;
+                    }
+                    const resized = document.createElement('canvas');
+                    resized.width = targetW;
+                    resized.height = targetH;
+                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
+                    outputCanvas = resized;
+                }
+
+                // 在縮放後的 canvas 上套用 LOGO（基於輸出尺寸計算位置）
+                if (STATE.customLogo.image) {
+                    p.applyCustomLogoToCanvas(outputCanvas);
+                }
+
+                // 橫R / 豎S（前綴）
+                const fw = outputCanvas.width;
+                const dirPrefix = fw > outputCanvas.height ? 'R_' : 'S_';
+
                 // 處理檔名衝突
-                const fullName = `${userPrefix}${dirPrefix}${filename}`;
+                let logoFilename = `${baseFilename}`;
+                const fullName = `${userPrefix}${dirPrefix}${logoFilename}`;
                 if (usedNames.has(fullName)) {
                     let counter = 1;
-                    const basePart = filename.substring(0, filename.lastIndexOf(suffix));
+                    const basePart = logoFilename.substring(0, logoFilename.lastIndexOf(suffix));
                     while (usedNames.has(`${userPrefix}${dirPrefix}${basePart}_${counter}${suffix}${ext}`)) {
                         counter++;
                     }
-                    filename = `${basePart}_${counter}${suffix}${ext}`;
+                    logoFilename = `${basePart}_${counter}${suffix}${ext}`;
                 }
-                usedNames.add(`${userPrefix}${dirPrefix}${filename}`);
-                return `${userPrefix}${dirPrefix}${filename}`;
-            })();
+                usedNames.add(`${userPrefix}${dirPrefix}${logoFilename}`);
+                const finalLogoFilename = `${userPrefix}${dirPrefix}${logoFilename}`;
 
-            const logoBlob = await writeExifToBlob(outputCanvas, exif, mimeType);
-            if (logoBlob) folder.file(logoFilename, logoBlob);
-            updateProgress(++completed.count, total);
+                const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
+                const logoBlob = await writeExifToBlob(outputCanvas, exif, mimeType);
+                if (logoBlob) folder.file(finalLogoFilename, logoBlob);
+                updateProgress(++completed.count, total);
+            }
 
-            // 處理無 Logo 版本（N_）- 只有在有 Logo 時才需要
-            if (hasLogo) {
-                const nFilename = (() => {
-                    let filename = `${baseFilename}`;
-                    // 處理檔名衝突
-                    const fullName = `${userPrefix}N_${filename}`;
-                    if (usedNames.has(fullName)) {
-                        let counter = 1;
-                        const basePart = filename.substring(0, filename.lastIndexOf(suffix));
-                        while (usedNames.has(`${userPrefix}N_${basePart}_${counter}${suffix}${ext}`)) {
-                            counter++;
-                        }
-                        filename = `${basePart}_${counter}${suffix}${ext}`;
-                    }
-                    usedNames.add(`${userPrefix}N_${filename}`);
-                    return `${userPrefix}N_${filename}`;
-                })();
+            // 處理無 Logo 版本（N_）- 使用乾淨版本（不含 LOGO 的 ImageData）
+            if (hasLogo && cleanImageData) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = cleanImageData.width;
+                tempCanvas.height = cleanImageData.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(cleanImageData, 0, 0);
 
-                // 取得無 Logo 的 ImageData（cleanImageData）
-                const cleanImageData = p.state.cleanImageData;
-                if (cleanImageData) {
-                    // 建立無 Logo 的 canvas
-                    const cleanCanvas = document.createElement('canvas');
-                    cleanCanvas.width = cleanImageData.width;
-                    cleanCanvas.height = cleanImageData.height;
-                    const cleanCtx = cleanCanvas.getContext('2d');
-                    cleanCtx.putImageData(cleanImageData, 0, 0);
-
-                    // 銳化
-                    if (STATE.enableSharpen) {
-                        const sharpened = applySharpen(cleanCanvas, cleanCtx);
-                        cleanCtx.putImageData(sharpened, 0, 0);
-                    }
-
-                    // 縮放（需同步 resize）
-                    let cleanOutput = cleanCanvas;
-                    if (preset) {
-                        const isLandscape = cleanOutput.width > cleanOutput.height;
-                        let targetW = isLandscape ? 1920 : 1080;
-                        let targetH = isLandscape ? 1080 : 1920;
-                        if (preset === '1280x720') {
-                            targetW = isLandscape ? 1280 : 720;
-                            targetH = isLandscape ? 720 : 1280;
-                        }
-                        const resized = document.createElement('canvas');
-                        resized.width = targetW;
-                        resized.height = targetH;
-                        resized.getContext('2d').drawImage(cleanOutput, 0, 0, targetW, targetH);
-                        cleanOutput = resized;
-                    }
-
-                    // EXIF
-                    const cleanExif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-                    const cleanBlob = await writeExifToBlob(cleanOutput, cleanExif, mimeType);
-                    if (cleanBlob) folder.file(nFilename, cleanBlob);
+                // 銳化
+                if (STATE.enableSharpen) {
+                    const sharpened = applySharpen(tempCanvas, tempCtx);
+                    tempCtx.putImageData(sharpened, 0, 0);
                 }
+
+                // 縮放
+                let cleanOutput = tempCanvas;
+                if (preset) {
+                    let targetW = isLandscape ? 1920 : 1080;
+                    let targetH = isLandscape ? 1080 : 1920;
+                    if (preset === '1280x720') {
+                        targetW = isLandscape ? 1280 : 720;
+                        targetH = isLandscape ? 720 : 1280;
+                    }
+                    const resized = document.createElement('canvas');
+                    resized.width = targetW;
+                    resized.height = targetH;
+                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
+                    cleanOutput = resized;
+                }
+
+                // 處理檔名衝突
+                let nFilename = `${baseFilename}`;
+                const fullName = `${userPrefix}N_${nFilename}`;
+                if (usedNames.has(fullName)) {
+                    let counter = 1;
+                    const basePart = nFilename.substring(0, nFilename.lastIndexOf(suffix));
+                    while (usedNames.has(`${userPrefix}N_${basePart}_${counter}${suffix}${ext}`)) {
+                        counter++;
+                    }
+                    nFilename = `${basePart}_${counter}${suffix}${ext}`;
+                }
+                usedNames.add(`${userPrefix}N_${nFilename}`);
+                const finalNFilename = `${userPrefix}N_${nFilename}`;
+
+                const cleanExif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
+                const cleanBlob = await writeExifToBlob(cleanOutput, cleanExif, mimeType);
+                if (cleanBlob) folder.file(finalNFilename, cleanBlob);
                 updateProgress(++completed.count, total);
             }
 
@@ -1520,12 +1572,12 @@ logoScale.addEventListener('input', (e) => {
 // 清除 Logo 按鈕事件
 clearLogoBtn.addEventListener('click', () => {
     STATE.customLogo.image = null;
-    STATE.customLogo.opacity = 0.8;
-    STATE.customLogo.scale = 1.0;
-    logoOpacity.value = 80;
-    logoOpacityValue.textContent = '80%';
-    logoScale.value = 100;
-    logoScaleValue.textContent = '100%';
+    STATE.customLogo.opacity = 0.2;
+    STATE.customLogo.scale = 2.0;
+    logoOpacity.value = 20;
+    logoOpacityValue.textContent = '20%';
+    logoScale.value = 200;
+    logoScaleValue.textContent = '200%';
     updateLogoPreviewUI();
     reprocessAllImages();
 });
