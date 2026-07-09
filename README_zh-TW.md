@@ -14,6 +14,7 @@
 <div align="center">
   <img src="assets/demo_preview_1.png" alt="實際演示 1" width="45%">
   <img src="assets/demo_preview_2.png" alt="實際演示 2" width="45%">
+  <img src="assets/demo_preview_3.png" alt="實際演示 3" width="45%">
 </div>
 
 

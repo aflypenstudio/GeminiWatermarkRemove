@@ -14,6 +14,7 @@ This project is a **modified version** focused on watermark removal with additio
 <div align="center">
   <img src="assets/demo_preview_1.png" alt="Demo Preview 1" width="45%">
   <img src="assets/demo_preview_2.png" alt="Demo Preview 2" width="45%">
+  <img src="assets/demo_preview_3.png" alt="Demo Preview 3" width="45%">
 </div>
 
 
