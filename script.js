@@ -1178,7 +1178,14 @@ dropZone.addEventListener('drop', (e) => {
     return false;
 });
 
+// Label wrapper in HTML handles click - no JS needed for file dialog
+dropZone.addEventListener('click', (e) => {
+    // Debug: log clicks
+    console.log('DropZone clicked, target:', e.target.tagName, e.target.className);
+});
+
 fileInput.addEventListener('change', (e) => {
+    console.log('File input changed, files:', e.target.files.length);
     handleFiles(e.target.files);
 });
 
