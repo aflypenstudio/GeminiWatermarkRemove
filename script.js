@@ -15,7 +15,10 @@ const STATE = {
         scale: 2.0       // 0.1 ~ 3.0 - Logo 縮放比例 (預設 2.0)
     },
     downloadFormat: 'png', // 'png' or 'jpeg' - 全域下載格式設定
-    resizePreset: '1280x720', // '' | '1280x720' | '1920x1080' - 自動縮小預設尺寸
+    resizePreset: '1280x720', // '' | '1280x720' | '1920x1080' | 'custom' - 自動縮小預設尺寸
+    customSize: { width: 1280, height: 720 }, // 自訂尺寸
+    brightness: 0,  // -100 ~ 100
+    contrast: 0,    // -100 ~ 100
     keepExif: true, // 保留 EXIF
     enableSharpen: false, // 銳化
     filenamePrefix: 'R_', // 檔名前綴
@@ -197,6 +200,71 @@ function applySharpen(canvas, ctx) {
     }
 
     return new ImageData(output, width, height);
+}
+
+/**
+ * 套用亮度/對比度調整到 Canvas
+ */
+function applyBrightnessContrast(canvas, ctx) {
+    if (STATE.brightness === 0 && STATE.contrast === 0) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    // 亮度：直接加到 RGB 值
+    const brightnessOffset = STATE.brightness * 2.55; // 轉換為 0-255 範圍
+    // 對比度：(128 + delta) 為中心，delta = (contrast / 100) * 128
+    const contrastFactor = (STATE.contrast + 100) / 100;
+    const contrastOffset = 128 * (1 - contrastFactor);
+
+    for (let i = 0; i < data.length; i += 4) {
+        for (let c = 0; c < 3; c++) {
+            let val = data[i + c];
+            // 套用對比度：先平移到 128，縮放，再平移回來
+            val = val * contrastFactor + contrastOffset;
+            // 套用亮度
+            val = val + brightnessOffset;
+            data[i + c] = Math.max(0, Math.min(255, val));
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+}
+
+/**
+ * 根據預設計算目標尺寸
+ * @param {number} srcW - 原始寬度
+ * @param {number} srcH - 原始高度
+ * @returns {{ targetW: number, targetH: number } | null} null 表示不縮放
+ */
+function calculateTargetSize(srcW, srcH) {
+    const preset = STATE.resizePreset;
+    if (!preset) return null;
+
+    const isLandscape = srcW > srcH;
+
+    if (preset === 'custom') {
+        // 自訂尺寸：寬高固定，不根據方向翻轉
+        return {
+            targetW: STATE.customSize.width || 1280,
+            targetH: STATE.customSize.height || 720
+        };
+    }
+
+    if (preset === '1920x1080') {
+        return {
+            targetW: isLandscape ? 1920 : 1080,
+            targetH: isLandscape ? 1080 : 1920
+        };
+    }
+
+    // 預設 1280x720
+    return {
+        targetW: isLandscape ? 1280 : 720,
+        targetH: isLandscape ? 720 : 1280
+    };
 }
 
 // Logo 相關 DOM 元素
@@ -970,26 +1038,18 @@ class ImageProcessor {
             tempCtx.putImageData(sharpened, 0, 0);
         }
 
+        // 套用亮度/對比度調整
+        applyBrightnessContrast(tempCanvas, tempCtx);
+
         // 處理縮放
         let outputCanvas = tempCanvas;
-        const preset = STATE.resizePreset;
-        if (preset) {
-            const isLandscape = imageData.width > imageData.height;
-            let targetW, targetH;
-
-            if (preset === '1920x1080') {
-                targetW = isLandscape ? 1920 : 1080;
-                targetH = isLandscape ? 1080 : 1920;
-            } else {
-                targetW = isLandscape ? 1280 : 720;
-                targetH = isLandscape ? 720 : 1280;
-            }
-
+        const targetSize = calculateTargetSize(imageData.width, imageData.height);
+        if (targetSize) {
             const resizedCanvas = document.createElement('canvas');
-            resizedCanvas.width = targetW;
-            resizedCanvas.height = targetH;
+            resizedCanvas.width = targetSize.targetW;
+            resizedCanvas.height = targetSize.targetH;
             const ctx = resizedCanvas.getContext('2d');
-            ctx.drawImage(tempCanvas, 0, 0, targetW, targetH);
+            ctx.drawImage(tempCanvas, 0, 0, targetSize.targetW, targetSize.targetH);
             outputCanvas = resizedCanvas;
         }
 
@@ -1156,6 +1216,13 @@ async function downloadAll() {
     }
     if (batchProgress) batchProgress.style.display = 'flex';
 
+    // 顯示批次下載提示（說明會同時下載含 LOGO 和純淨版）
+    const hasLogo = STATE.customLogo.image !== null;
+    if (batchCleanHint) {
+        batchCleanHint.style.display = hasLogo ? 'inline' : 'none';
+    }
+}
+
     // 無 JSZip 時降級到依序下載
     if (typeof JSZip === 'undefined') {
         let delay = 0;
@@ -1239,19 +1306,17 @@ async function downloadAll() {
                     tempCtx.putImageData(sharpened, 0, 0);
                 }
 
+                // 套用亮度/對比度
+                applyBrightnessContrast(tempCanvas, tempCtx);
+
                 // 縮放
+                const targetSizeR = calculateTargetSize(imageData.width, imageData.height);
                 let outputCanvas = tempCanvas;
-                if (preset) {
-                    let targetW = isLandscape ? 1920 : 1080;
-                    let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') {
-                        targetW = isLandscape ? 1280 : 720;
-                        targetH = isLandscape ? 720 : 1280;
-                    }
+                if (targetSizeR) {
                     const resized = document.createElement('canvas');
-                    resized.width = targetW;
-                    resized.height = targetH;
-                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
+                    resized.width = targetSizeR.targetW;
+                    resized.height = targetSizeR.targetH;
+                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetSizeR.targetW, targetSizeR.targetH);
                     outputCanvas = resized;
                 }
 
@@ -1298,19 +1363,17 @@ async function downloadAll() {
                     tempCtx.putImageData(sharpened, 0, 0);
                 }
 
+                // 套用亮度/對比度
+                applyBrightnessContrast(tempCanvas, tempCtx);
+
                 // 縮放
+                const targetSizeN = calculateTargetSize(cleanImageData.width, cleanImageData.height);
                 let cleanOutput = tempCanvas;
-                if (preset) {
-                    let targetW = isLandscape ? 1920 : 1080;
-                    let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') {
-                        targetW = isLandscape ? 1280 : 720;
-                        targetH = isLandscape ? 720 : 1280;
-                    }
+                if (targetSizeN) {
                     const resized = document.createElement('canvas');
-                    resized.width = targetW;
-                    resized.height = targetH;
-                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
+                    resized.width = targetSizeN.targetW;
+                    resized.height = targetSizeN.targetH;
+                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetSizeN.targetW, targetSizeN.targetH);
                     cleanOutput = resized;
                 }
 
@@ -1402,9 +1465,50 @@ if (downloadFormatSelect) {
 }
 
 const resizePresetSelect = document.getElementById('resizePreset');
+const customSizeInputs = document.getElementById('customSizeInputs');
+const customWidthInput = document.getElementById('customWidth');
+const customHeightInput = document.getElementById('customHeight');
+const brightnessSlider = document.getElementById('brightnessSlider');
+const brightnessValueEl = document.getElementById('brightnessValue');
+const contrastSlider = document.getElementById('contrastSlider');
+const contrastValueEl = document.getElementById('contrastValue');
+const batchCleanHint = document.getElementById('batchCleanHint');
+
 if (resizePresetSelect) {
     resizePresetSelect.addEventListener('change', (e) => {
         STATE.resizePreset = e.target.value;
+        // 顯示/隱藏自訂尺寸輸入框
+        if (customSizeInputs) {
+            customSizeInputs.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+        }
+    });
+}
+
+// 自訂尺寸輸入監聽
+if (customWidthInput) {
+    customWidthInput.addEventListener('input', (e) => {
+        STATE.customSize.width = parseInt(e.target.value) || 1280;
+    });
+}
+if (customHeightInput) {
+    customHeightInput.addEventListener('input', (e) => {
+        STATE.customSize.height = parseInt(e.target.value) || 720;
+    });
+}
+
+// 亮度調整監聽
+if (brightnessSlider) {
+    brightnessSlider.addEventListener('input', (e) => {
+        STATE.brightness = parseInt(e.target.value);
+        if (brightnessValueEl) brightnessValueEl.textContent = STATE.brightness;
+    });
+}
+
+// 對比度調整監聽
+if (contrastSlider) {
+    contrastSlider.addEventListener('input', (e) => {
+        STATE.contrast = parseInt(e.target.value);
+        if (contrastValueEl) contrastValueEl.textContent = STATE.contrast;
     });
 }
 
