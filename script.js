@@ -310,7 +310,7 @@ async function init() {
         if (type === 'PROCESS_COMPLETE') {
             const processor = STATE.processors.find(p => p.id === id);
             if (processor) {
-                processor.handleWorkerResult(payload.imageData);
+                processor.handleWorkerResult(payload.imageData, payload.watermarkRegion, payload.appliedGain);
             }
         } else if (type === 'PROCESS_ERROR') {
             console.error('Worker error:', payload);
