@@ -797,7 +797,8 @@ class ImageProcessor {
     /**
      * 疊加自訂 Logo 到指定 canvas 的水印位置
      * Logo 會自動縮放以配合 canvas 比例，並套用透明度
-     * 大小基於 canvas 寬度的 3%~15%（scale 10%~300% 對應此範圍）
+     * 大小基於 canvas 較短邊的 3%~15%（scale 10%~300% 對應此範圍）
+     * 使用較短邊計算，確保橫式/直式輸出時 LOGO 大小一致
      * 位置跟随水印区域（用于掩盖去水印后的痕迹）
      */
     applyCustomLogoToCanvas(targetCanvas) {
@@ -811,12 +812,13 @@ class ImageProcessor {
         const h = targetCanvas.height;
         const userScale = STATE.customLogo.scale; // 0.1 ~ 3.0
 
-        // 基於目標 canvas 寬度計算 Logo 大小
+        // 基於較短邊計算 Logo 大小，確保橫式/直式輸出時 LOGO 大小一致
         const minPercent = 0.03;
         const maxPercent = 0.15;
         const percentRange = maxPercent - minPercent;
         const logoPercent = minPercent + percentRange * ((userScale - 0.1) / 2.9);
-        const targetSize = w * logoPercent;
+        const shortSide = Math.min(w, h);  // 使用較短邊
+        const targetSize = shortSide * logoPercent;
 
         // 計算縮放比例（保持寬高比，以 targetSize 為最大邊）
         const scale = Math.min(targetSize / logo.width, targetSize / logo.height);
@@ -839,7 +841,7 @@ class ImageProcessor {
             posY = watermarkRegion.y * scaleY;
         } else {
             // 備用：放在右下角
-            const margin = w * 0.02;
+            const margin = shortSide * 0.02;
             posX = w - margin - scaledWidth;
             posY = h - margin - scaledHeight;
         }
@@ -856,7 +858,8 @@ class ImageProcessor {
     /**
      * 疊加自訂 Logo 到圖片的水印位置（用於 UI 預覽）
      * Logo 會自動縮放以配合圖片比例，並套用透明度
-     * 大小基於圖片寬度的 3%~15%（scale 10%~300% 對應此範圍）
+     * 大小基於圖片較短邊的 3%~15%（scale 10%~300% 對應此範圍）
+     * 使用較短邊計算，確保橫式/直式輸出時 LOGO 大小一致
      * 位置跟随水印区域（用于掩盖去水印后的痕迹）
      */
     applyCustomLogo() {
@@ -871,12 +874,13 @@ class ImageProcessor {
         const h = canvas.height;
         const userScale = STATE.customLogo.scale; // 0.1 ~ 3.0
 
-        // 基於圖片寬度計算 Logo 大小
+        // 基於較短邊計算 Logo 大小，確保橫式/直式輸出時 LOGO 大小一致
         const minPercent = 0.03;
         const maxPercent = 0.15;
         const percentRange = maxPercent - minPercent;
         const logoPercent = minPercent + percentRange * ((userScale - 0.1) / 2.9);
-        const targetSize = w * logoPercent;
+        const shortSide = Math.min(w, h);  // 使用較短邊
+        const targetSize = shortSide * logoPercent;
 
         // 計算縮放比例（保持寬高比，以 targetSize 為最大邊）
         const scale = Math.min(targetSize / logo.width, targetSize / logo.height);
@@ -893,7 +897,7 @@ class ImageProcessor {
             posY = watermarkRegion.y;
         } else {
             // 備用：放在右下角
-            const margin = w * 0.02;
+            const margin = shortSide * 0.02;
             posX = w - margin - scaledWidth;
             posY = h - margin - scaledHeight;
         }
