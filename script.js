@@ -1060,12 +1060,23 @@ async function downloadAll() {
     // 無 JSZip 時降級到依序下載
     if (typeof JSZip === 'undefined') {
         let delay = 0;
+        const hasLogo = STATE.customLogo.image !== null;
+        const totalItems = STATE.processors.length * (hasLogo ? 2 : 1);
         STATE.processors.forEach((p, i) => {
+            // 下載含 Logo 版本（R_/S_）
             setTimeout(() => {
-                p.download();
-                updateProgress(i + 1, STATE.processors.length);
+                p.download(false);
+                updateProgress(i * (hasLogo ? 2 : 1) + 1, totalItems);
             }, delay);
             delay += 500;
+            // 下載無 Logo 版本（N_）- 只有在有 Logo 時才需要
+            if (hasLogo && p.state.cleanImageData) {
+                setTimeout(() => {
+                    p.download(true);
+                    updateProgress(i * 2 + 2, totalItems);
+                }, delay);
+                delay += 500;
+            }
         });
         setTimeout(() => {
             if (btn) {
@@ -1075,7 +1086,7 @@ async function downloadAll() {
             }
             if (batchProgress) batchProgress.style.display = 'none';
             Localization.apply();
-        }, STATE.processors.length * 500 + 1000);
+        }, delay + 1000);
         return;
     }
 
@@ -1084,13 +1095,14 @@ async function downloadAll() {
     const usedNames = new Set();
 
     try {
-        const total = STATE.processors.length;
+        const total = STATE.processors.length * 2; // R_/S_ + N_
         const completed = { count: 0 };
+        const hasLogo = STATE.customLogo.image !== null;
 
         const promises = STATE.processors.map(p => new Promise(async (resolve) => {
             const imageData = p.getImageForDownload();
             if (!imageData) {
-                updateProgress(++completed.count, total);
+                updateProgress(completed.count += hasLogo ? 2 : 1, total);
                 resolve(false);
                 return;
             }
@@ -1133,33 +1145,99 @@ async function downloadAll() {
             // EXIF
             const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
 
-            // 構建檔名
+            // 優先從 DOM 讀取，確保獲取最新值
+            const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
+
+            // 構建檔名（不含前綴）
             const nameParts = p.file.name.split('.');
             nameParts.pop();
             const suffix = Localization.get('cleanSuffix') || '_clean';
-            let filename = `${nameParts.join('.')}${suffix}${ext}`;
+            const baseFilename = `${nameParts.join('.')}${suffix}${ext}`;
 
-            if (usedNames.has(filename)) {
-                let counter = 1;
-                const basePart = filename.substring(0, filename.lastIndexOf(suffix));
-                while (usedNames.has(filename)) {
-                    filename = `${basePart}_${counter}${suffix}${ext}`;
-                    counter++;
-                }
-            }
-            usedNames.add(filename);
-
+            // 橫R / 豎S（前綴）
             const fw = outputCanvas.width;
-            // 橫R / 豎S
             const dirPrefix = fw > outputCanvas.height ? 'R_' : 'S_';
-            // 優先從 DOM 讀取，確保獲取最新值
-            const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
-            filename = `${userPrefix}${dirPrefix}${filename}`;
 
-            const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
-            if (blob) folder.file(filename, blob);
+            // 處理含 Logo 版本（R_/S_）
+            const logoFilename = (() => {
+                let filename = `${baseFilename}`;
+                // 處理檔名衝突
+                const fullName = `${userPrefix}${dirPrefix}${filename}`;
+                if (usedNames.has(fullName)) {
+                    let counter = 1;
+                    const basePart = filename.substring(0, filename.lastIndexOf(suffix));
+                    while (usedNames.has(`${userPrefix}${dirPrefix}${basePart}_${counter}${suffix}${ext}`)) {
+                        counter++;
+                    }
+                    filename = `${basePart}_${counter}${suffix}${ext}`;
+                }
+                usedNames.add(`${userPrefix}${dirPrefix}${filename}`);
+                return `${userPrefix}${dirPrefix}${filename}`;
+            })();
 
+            const logoBlob = await writeExifToBlob(outputCanvas, exif, mimeType);
+            if (logoBlob) folder.file(logoFilename, logoBlob);
             updateProgress(++completed.count, total);
+
+            // 處理無 Logo 版本（N_）- 只有在有 Logo 時才需要
+            if (hasLogo) {
+                const nFilename = (() => {
+                    let filename = `${baseFilename}`;
+                    // 處理檔名衝突
+                    const fullName = `${userPrefix}N_${filename}`;
+                    if (usedNames.has(fullName)) {
+                        let counter = 1;
+                        const basePart = filename.substring(0, filename.lastIndexOf(suffix));
+                        while (usedNames.has(`${userPrefix}N_${basePart}_${counter}${suffix}${ext}`)) {
+                            counter++;
+                        }
+                        filename = `${basePart}_${counter}${suffix}${ext}`;
+                    }
+                    usedNames.add(`${userPrefix}N_${filename}`);
+                    return `${userPrefix}N_${filename}`;
+                })();
+
+                // 取得無 Logo 的 ImageData（cleanImageData）
+                const cleanImageData = p.state.cleanImageData;
+                if (cleanImageData) {
+                    // 建立無 Logo 的 canvas
+                    const cleanCanvas = document.createElement('canvas');
+                    cleanCanvas.width = cleanImageData.width;
+                    cleanCanvas.height = cleanImageData.height;
+                    const cleanCtx = cleanCanvas.getContext('2d');
+                    cleanCtx.putImageData(cleanImageData, 0, 0);
+
+                    // 銳化
+                    if (STATE.enableSharpen) {
+                        const sharpened = applySharpen(cleanCanvas, cleanCtx);
+                        cleanCtx.putImageData(sharpened, 0, 0);
+                    }
+
+                    // 縮放（需同步 resize）
+                    let cleanOutput = cleanCanvas;
+                    if (preset) {
+                        const isLandscape = cleanOutput.width > cleanOutput.height;
+                        let targetW = isLandscape ? 1920 : 1080;
+                        let targetH = isLandscape ? 1080 : 1920;
+                        if (preset === '1280x720') {
+                            targetW = isLandscape ? 1280 : 720;
+                            targetH = isLandscape ? 720 : 1280;
+                        }
+                        const resized = document.createElement('canvas');
+                        resized.width = targetW;
+                        resized.height = targetH;
+                        resized.getContext('2d').drawImage(cleanOutput, 0, 0, targetW, targetH);
+                        cleanOutput = resized;
+                    }
+
+                    // EXIF
+                    const cleanExif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
+                    const cleanBlob = await writeExifToBlob(cleanOutput, cleanExif, mimeType);
+                    if (cleanBlob) folder.file(nFilename, cleanBlob);
+                }
+                updateProgress(++completed.count, total);
+            }
+
             resolve(true);
         }));
 
@@ -1176,8 +1254,14 @@ async function downloadAll() {
     } catch (err) {
         console.error('ZIP generation failed:', err);
         alert('建立 ZIP 失敗，已改為個別下載。');
-        // 降級到依序下載
-        STATE.processors.forEach(p => p.download());
+        // 降級到依序下載（同時下載 R_/S_ 和 N_ 版本）
+        const hasLogo = STATE.customLogo.image !== null;
+        STATE.processors.forEach((p, i) => {
+            setTimeout(() => p.download(false), i * 600); // 含 Logo 版本
+            if (hasLogo && p.state.cleanImageData) {
+                setTimeout(() => p.download(true), i * 600 + 300); // 無 Logo 版本
+            }
+        });
     } finally {
         if (btn) {
             btn.disabled = false;
