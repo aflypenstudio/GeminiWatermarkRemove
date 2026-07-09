@@ -56,6 +56,7 @@ const translations = {
         "fileNamePrefix": "前綴:",
         "downloadClean": "純淨版",
         "downloadLogo": "含 Logo 版",
+        "downloadBoth": "兩者都要",
         "optionsTitle": "輸出選項"
     },
     "zh-CN": {

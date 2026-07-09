@@ -504,7 +504,7 @@ class ImageProcessor {
                     </div>
                 </div>
 
-                <div class="actions" style="display: flex; gap: 1rem;">
+                <div class="actions">
                     <button class="btn btn-secondary compare-btn" title="${Localization.get('compareTitle')}">
                         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -516,12 +516,18 @@ class ImageProcessor {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                    <button class="btn btn-primary download-btn" disabled>
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                        </svg>
-                        <span data-i18n="downloadBtn">${Localization.get('downloadBtn')}</span>
-                    </button>
+                    <div class="download-with-type" style="display: flex; flex: 1; gap: 0;">
+                        <select class="download-type-select" style="padding: 0.5rem 0.25rem; font-size: 0.75rem; border-radius: 0.5rem 0 0 0.5rem; min-width: 0; max-width: 90px;">
+                            <option value="logo">${Localization.get('downloadLogo') || '含 Logo'}</option>
+                            <option value="clean">${Localization.get('downloadClean') || '純淨版'}</option>
+                            <option value="both">${Localization.get('downloadBoth') || '兩者都要'}</option>
+                        </select>
+                        <button class="btn btn-primary download-btn" disabled style="border-radius: 0 0.5rem 0.5rem 0; padding: 0.5rem; flex: 1;">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="filename-display" title="${this.file.name}" style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
@@ -540,6 +546,7 @@ class ImageProcessor {
         this.elements.alphaValue = card.querySelector('.alpha-value');
         this.elements.autoStrengthCheck = card.querySelector('.auto-strength-check');
         this.elements.downloadBtn = card.querySelector('.download-btn');
+        this.elements.downloadTypeSelect = card.querySelector('.download-type-select');
         this.elements.removeBtn = card.querySelector('.remove-btn');
         this.elements.compareBtn = card.querySelector('.compare-btn');
         this.elements.wrapper = card.querySelector('.image-wrapper');
@@ -577,7 +584,16 @@ class ImageProcessor {
             this.processAndRender();
         });
 
-        this.elements.downloadBtn.addEventListener('click', () => this.download(false));
+        this.elements.downloadBtn.addEventListener('click', () => {
+            const type = this.elements.downloadTypeSelect ? this.elements.downloadTypeSelect.value : 'logo';
+            if (type === 'both') {
+                // 下載兩個版本
+                this.download(false); // 含 Logo
+                setTimeout(() => this.download(true), 300); // 純淨版
+            } else {
+                this.download(type === 'clean');
+            }
+        });
         this.elements.removeBtn.addEventListener('click', () => this.destroy());
 
         // Comparison interactions
@@ -908,14 +924,21 @@ class ImageProcessor {
             // 構建檔名
             const nameParts = this.file.name.split('.');
             nameParts.pop();
-            const suffix = isClean ? '' : (Localization.get('cleanSuffix') || '_clean');
             const w = outputCanvas.width;
             const h = outputCanvas.height;
-            const dirPrefix = w > h ? 'R_' : 'S_';
+            const suffix = Localization.get('cleanSuffix') || '_clean';
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
 
-            link.download = `${userPrefix}${dirPrefix}${nameParts.join('.')}${suffix}${ext}`;
+            // 方向前綴：横R / 豎S / 無Logo N
+            if (isClean) {
+                // 純淨版（去除浮水印、無 Logo）: N_圖片_clean.png
+                link.download = `${userPrefix}N_${nameParts.join('.')}${suffix}${ext}`;
+            } else {
+                // 含 Logo 版: R_圖片_clean.png / S_圖片_clean.png
+                const dirPrefix = w > h ? 'R_' : 'S_';
+                link.download = `${userPrefix}${dirPrefix}${nameParts.join('.')}${suffix}${ext}`;
+            }
 
             link.href = url;
             link.click();
@@ -1147,7 +1170,8 @@ async function downloadAll(isClean = false) {
 
             const fw = outputCanvas.width;
             const fh = outputCanvas.height;
-            const dirPrefix = fw > fh ? 'R_' : 'S_';
+            // 橫R / 豎S / 無Logo N
+            const dirPrefix = isClean ? 'N_' : (fw > fh ? 'R_' : 'S_');
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
             filename = `${userPrefix}${dirPrefix}${filename}`;
