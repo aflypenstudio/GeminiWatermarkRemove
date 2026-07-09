@@ -912,7 +912,8 @@ class ImageProcessor {
             const w = outputCanvas.width;
             const h = outputCanvas.height;
             const dirPrefix = w > h ? 'R_' : 'S_';
-            const userPrefix = STATE.filenamePrefix || '';
+            // 優先從 DOM 讀取，確保獲取最新值
+            const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
 
             link.download = `${userPrefix}${dirPrefix}${nameParts.join('.')}${suffix}${ext}`;
 
@@ -1144,7 +1145,8 @@ async function downloadAll(isClean = false) {
             const fw = outputCanvas.width;
             const fh = outputCanvas.height;
             const dirPrefix = fw > fh ? 'R_' : 'S_';
-            const userPrefix = STATE.filenamePrefix || '';
+            // 優先從 DOM 讀取，確保獲取最新值
+            const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
             filename = `${userPrefix}${dirPrefix}${filename}`;
 
             const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
