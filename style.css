@@ -300,7 +300,7 @@ body.has-files .app-card {
 }
 
 .drop-zone:hover,
-.drop-zone.drag-over {
+.drop-zone.dragover {
   border-color: #7c3aed;
   background-color: rgba(124, 58, 237, 0.05);
 }
@@ -677,105 +677,6 @@ body.has-files .app-card {
 .sort-selector select {
   padding: 0.4rem 0.6rem;
   font-size: 0.9rem;
-}
-
-/* Custom Size Inputs */
-.custom-size-inputs {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-left: 0.5rem;
-}
-
-.custom-size-inputs input[type="number"] {
-  width: 65px;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.4rem;
-  background: var(--bg-color);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.custom-size-inputs span {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-/* Brightness / Contrast Adjustments */
-.output-adjustments {
-  gap: 2rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border-color);
-  margin-top: 0.25rem;
-}
-
-.adjustment-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  min-width: 140px;
-}
-
-.adjustment-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-
-.adjustment-label label {
-  font-weight: 500;
-}
-
-.adjustment-value {
-  font-family: monospace;
-  font-size: 0.8rem;
-  min-width: 32px;
-  text-align: right;
-}
-
-.adjustment-group input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.12);
-  outline: none;
-  cursor: pointer;
-}
-
-.adjustment-group input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #7c3aed;
-  cursor: pointer;
-}
-
-.adjustment-group input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #7c3aed;
-  cursor: pointer;
-  border: none;
-}
-
-/* Batch Clean Hint */
-.batch-clean-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  background: var(--bg-secondary);
-  padding: 0.25rem 0.6rem;
-  border-radius: 1rem;
-  border: 1px solid var(--border-color);
-  white-space: nowrap;
 }
 
 /* Batch Progress */

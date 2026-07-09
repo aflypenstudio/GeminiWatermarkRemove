@@ -41,7 +41,6 @@ const translations = {
         "resizeOff": "關閉縮小",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080",
-        "resizeCustom": "自訂尺寸",
         "sortBy": "排序:",
         "sortName": "依檔名",
         "sortDate": "依時間",
@@ -53,9 +52,6 @@ const translations = {
         "fileNameTemplate": "檔名範本:",
         "fileNamePrefix": "前綴:",
         "noLogoOption": "無 Logo 版本",
-        "brightnessLabel": "亮度",
-        "contrastLabel": "對比度",
-        "batchCleanHint": "⚠️ 含 R_/S_ + N_ 兩種版本",
         "optionsTitle": "輸出選項"
     },
     "zh-CN": {
@@ -100,7 +96,6 @@ const translations = {
         "resizeOff": "关闭缩小",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080",
-        "resizeCustom": "自定义尺寸",
         "sortBy": "排序:",
         "sortName": "依档名",
         "sortDate": "依时间",
@@ -112,9 +107,6 @@ const translations = {
         "fileNameTemplate": "档名模板:",
         "fileNamePrefix": "前缀:",
         "noLogoOption": "无 Logo 版本",
-        "brightnessLabel": "亮度",
-        "contrastLabel": "对比度",
-        "batchCleanHint": "⚠️ 含 R_/S_ + N_ 两种版本",
         "optionsTitle": "输出选项"
     },
     "en": {
@@ -159,7 +151,6 @@ const translations = {
         "resizeOff": "Off",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080",
-        "resizeCustom": "Custom Size",
         "sortBy": "Sort:",
         "sortName": "By Name",
         "sortDate": "By Date",
@@ -171,9 +162,6 @@ const translations = {
         "fileNameTemplate": "Filename:",
         "fileNamePrefix": "Prefix:",
         "noLogoOption": "No Logo Version",
-        "brightnessLabel": "Brightness",
-        "contrastLabel": "Contrast",
-        "batchCleanHint": "⚠️ Contains R_/S_ + N_ versions",
         "optionsTitle": "Output Options"
     },
     "ja": {
@@ -218,21 +206,17 @@ const translations = {
         "resizeOff": "끔",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080",
-        "resizeCustom": "カスタムサイズ",
         "sortBy": "排序:",
         "sortName": "依檔名",
         "sortDate": "依時間",
         "sortAsc": "昇冪",
         "sortDesc": "降冪",
-        "progressLabel": "処理進度:",
+        "progressLabel": "處理進度:",
         "exifLabel": "EXIF 保持",
         "sharpenLabel": "シャープ化",
         "fileNameTemplate": "ファイル名:",
         "fileNamePrefix": "接頭辞:",
         "noLogoOption": "ロゴなしバージョン",
-        "brightnessLabel": "明るさ",
-        "contrastLabel": "コントラスト",
-        "batchCleanHint": "⚠️ R_/S_ + N_ 両バージョン対応",
         "optionsTitle": "出力オプション"
     },
     "ko": {
@@ -277,7 +261,6 @@ const translations = {
         "resizeOff": "끔",
         "resize1280x720": "1280×720",
         "resize1920x1080": "1920×1080",
-        "resizeCustom": "사용자 지정",
         "sortBy": "정렬:",
         "sortName": "이름순",
         "sortDate": "날짜순",
@@ -289,9 +272,6 @@ const translations = {
         "fileNameTemplate": "파일명:",
         "fileNamePrefix": "접두사:",
         "noLogoOption": "로고 없음 버전",
-        "brightnessLabel": "밝기",
-        "contrastLabel": "대비",
-        "batchCleanHint": "⚠️ R_/S_ + N_ 버전 포함",
         "optionsTitle": "출력 옵션"
     }
 };

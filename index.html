@@ -87,13 +87,7 @@
                                 <option value="" data-i18n="resizeOff">關閉縮小</option>
                                 <option value="1280x720" selected data-i18n="resize1280x720">1280×720</option>
                                 <option value="1920x1080" data-i18n="resize1920x1080">1920×1080</option>
-                                <option value="custom" data-i18n="resizeCustom">自訂尺寸</option>
                             </select>
-                            <div id="customSizeInputs" class="custom-size-inputs" style="display: none;">
-                                <input type="number" id="customWidth" placeholder="寬" min="1" max="8192">
-                                <span>×</span>
-                                <input type="number" id="customHeight" placeholder="高" min="1" max="8192">
-                            </div>
                         </div>
                     </div>
                     <!-- 第二列：EXIF+銳化+檔名範本 -->
@@ -126,23 +120,6 @@
                             <button id="applySortBtn" class="btn btn-small btn-secondary">套用排序</button>
                         </div>
                     </div>
-                    <!-- 第四列： brightness/contrast 調整 -->
-                    <div class="output-row output-adjustments">
-                        <div class="adjustment-group" id="brightnessGroup">
-                            <div class="adjustment-label">
-                                <label data-i18n="brightnessLabel">亮度</label>
-                                <span id="brightnessValue" class="adjustment-value">0</span>
-                            </div>
-                            <input type="range" id="brightnessSlider" min="-100" max="100" value="0" step="1">
-                        </div>
-                        <div class="adjustment-group" id="contrastGroup">
-                            <div class="adjustment-label">
-                                <label data-i18n="contrastLabel">對比度</label>
-                                <span id="contrastValue" class="adjustment-value">0</span>
-                            </div>
-                            <input type="range" id="contrastSlider" min="-100" max="100" value="0" step="1">
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -163,7 +140,6 @@
                     </svg>
                     <span data-i18n="downloadAll">下載全部</span>
                 </button>
-                <span id="batchCleanHint" class="batch-clean-hint" style="display: none;" data-i18n="batchCleanHint">⚠️ 包含 R_/S_ 及 N_ 兩種版本</span>
             </div>
 
             <!-- 自訂 Logo 設定區塊（可收合式） -->
@@ -240,10 +216,7 @@
                     </p>
                 </div>
 
-                <!-- label 包裹：點擊整個 dropZone 都會觸發檔案對話框 -->
-                <label for="fileInput" style="display:contents; cursor:pointer;">
-                    <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
-                </label>
+                <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
             </div>
         </div>
     </div>
