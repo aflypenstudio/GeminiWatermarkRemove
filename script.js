@@ -2,6 +2,22 @@
  * Gemini Watermark Remover - Batch Processing
  */
 
+// ============================================================================
+// CRITICAL: Document-level drag/drop handlers MUST be registered first
+// to prevent browser default file-open behavior before any other code runs.
+// ============================================================================
+document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+}, false);
+
+document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+}, false);
+
 const STATE = {
     masks: {
         small: null, // { width: 48, height: 48, alphas: Float32Array }
@@ -1142,6 +1158,7 @@ dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.stopPropagation();
     dropZone.classList.add('drag-over');
+    return false;
 });
 
 dropZone.addEventListener('dragleave', (e) => {
@@ -1159,15 +1176,7 @@ dropZone.addEventListener('drop', (e) => {
     if (files && files.length > 0) {
         handleFiles(files);
     }
-});
-
-// Also listen on document level to catch drops anywhere on the page
-document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-});
-
-document.addEventListener('drop', (e) => {
-    e.preventDefault();
+    return false;
 });
 
 
