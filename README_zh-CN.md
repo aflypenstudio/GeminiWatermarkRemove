@@ -56,11 +56,11 @@
 
 1. **克隆项目**：
    ```bash
-   git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
+   git clone https://github.com/aflypenstudio/BananaWatermarkRemover.git
    ```
 2. **进入目录**：
    ```bash
-   cd GeminiWatermarkRemove
+   cd BananaWatermarkRemover
    ```
 3. **运行**：
    直接用浏览器打开 `index.html` 即可使用。
@@ -90,8 +90,8 @@
 cargo install tauri-cli
 
 # 克隆并构建
-git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
-cd GeminiWatermarkRemove
+git clone https://github.com/aflypenstudio/BananaWatermarkRemover.git
+cd BananaWatermarkRemover
 git checkout feature/tauri-app
 
 # 开发模式

@@ -414,7 +414,7 @@ function fetchGitHubStars() {
     const starCountElement = document.getElementById('githubStarCount');
     if (!starCountElement) return;
 
-    fetch('https://api.github.com/repos/kevintsai1202/GeminiWatermarkRemove')
+    fetch('https://api.github.com/repos/aflypenstudio/BananaWatermarkRemover')
         .then(response => {
             if (!response.ok) throw new Error('Network response was not ok');
             return response.json();

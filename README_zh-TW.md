@@ -58,11 +58,11 @@
 
 1. **複製專案**：
    ```bash
-   git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
+   git clone https://github.com/aflypenstudio/BananaWatermarkRemover.git
    ```
 2. **進入目錄**：
    ```bash
-   cd GeminiWatermarkRemove
+   cd BananaWatermarkRemover
    ```
 3. **執行**：
    直接用瀏覽器打開 `index.html` 即可使用。

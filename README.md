@@ -58,11 +58,11 @@ This is a static web project requiring no complex backend environment.
 
 1. **Clone the Project**:
    ```bash
-   git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
+   git clone https://github.com/aflypenstudio/BananaWatermarkRemover.git
    ```
 2. **Enter Directory**:
    ```bash
-   cd GeminiWatermarkRemove
+   cd BananaWatermarkRemover
    ```
 3. **Run**:
    Open `index.html` in your browser.
