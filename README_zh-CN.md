@@ -1,10 +1,13 @@
-# Gemini Watermark Remover
+# 巴娜娜水印&微調器
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [English](README.md) | [繁體中文](README_zh-TW.md) | [简体中文](README_zh-CN.md) | [日本語](README_ja.md) | [한국어](README_ko.md)
 
 这是一个强大的网页工具，专门设计用于去除由 Google Gemini 生成图片中的水印。此工具完全在浏览器端运行，无需将图片上传至服务器，确保您的隐私安全。
+
+## 🎯 与原版的差异
+本项目是专注于水印移除并强化标志定制功能的**改版**。
 
 ## 🖼️ 实际演示
 
@@ -17,7 +20,12 @@
 ## ✨ 主要功能
 
 - **🚫 自动去除水印**：利用逆向 Alpha 混合算法（Reverse Alpha Blending），精确还原被水印覆盖的像素。
-- **🎨 自定义 Logo 替换**：上传您的 Logo 图片，取代原本水印位置，并可调整透明度（0% ~ 100%）及大小（10% ~ 200%）。
+- **🎨 自定义 Logo 替换**：上传您的 Logo 图片，取代原本水印位置，并可调整透明度（0% ~ 100%）及大小（10% ~ 300%）。
+- **📥 弹性下载选项**：
+  - **单张下载**：点击下载按钮取得含 Logo 版本（前置 R_/S_）。下载前勾选「N」可下载无 Logo 版本（N_ 前缀）。
+  - **批量下载**：上传 Logo 后，ZIP 会同时包含两种版本：
+    - 含 Logo：`R_图片_clean.png`（横式）/ `S_图片_clean.png`（竖式）
+    - 无 Logo：`N_图片_clean.png`
 - **🔒 隐私优先**：所有处理皆在您的本地浏览器中完成，图片不会离开您的设备。
 - **⚡ 即时预览**：上传即处理，快速查看结果。
 - **🖱️ 拖拽支持**：支持将图片直接拖拽至窗口进行处理。
@@ -26,9 +34,8 @@
   - **自动检测**：根据图片分辨率自动判断水印大小。
   - **手动选择**：可强制选择小（48px）或大（96px）水印模式以应对特殊情况。
 - **💾 高画质下载**：一键下载处理后的图片，支持 PNG（无损）或 JPEG（压缩）格式。
-- **🖥️ 桌面应用程序**：提供 Tauri 原生桌面应用，离线使用、性能更佳。
 - **📋 剪贴板粘贴**：支持直接粘贴 (Ctrl+V) 截图或图片进行处理。
-- **📦 批量 ZIP 下载**：下载多张图片时自动打包为 ZIP 文件，方便整理。
+- **📦 批量 ZIP 下载**：下载多张图片时自动打包为 ZIP 文件（`banana_watermark_remover.zip`），方便整理。
 - **🌐 多语言支持**：界面支持英文、繁体中文、简体中文、日文及韩文。
 
 ## 🛠️ 技术原理
@@ -49,7 +56,7 @@
 
 1. **克隆项目**：
    ```bash
-   git clone https://github.com/kevintsai1202/GeminiWatermarkRemove.git
+   git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
    ```
 2. **进入目录**：
    ```bash
@@ -83,7 +90,7 @@
 cargo install tauri-cli
 
 # 克隆并构建
-git clone https://github.com/kevintsai1202/GeminiWatermarkRemove.git
+git clone https://github.com/aflypenstudio/GeminiWatermarkRemove.git
 cd GeminiWatermarkRemove
 git checkout feature/tauri-app
 
