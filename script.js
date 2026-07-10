@@ -1211,7 +1211,7 @@ window.addEventListener('paste', (e) => {
 // =============================================================================
 
 /**
- * 批次下載所有圖片（包含三個版本）
+ * 批次下載所有圖片（一般版 + 純淨版）
  */
 async function downloadAll() {
     if (STATE.processors.length === 0) return;
@@ -1224,7 +1224,7 @@ async function downloadAll() {
     }
     if (batchProgress) batchProgress.style.display = 'flex';
 
-    const totalItems = STATE.processors.length * 3; // 3 types each
+    const totalItems = STATE.processors.length * 2; // 2 types each
 
     // 無 JSZip 時降級到依序下載
     if (typeof JSZip === 'undefined') {
@@ -1232,7 +1232,6 @@ async function downloadAll() {
         let itemIndex = 0;
         STATE.processors.forEach((p) => {
             setTimeout(() => { p.download('normal'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
-            setTimeout(() => { p.download('mirror'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
             setTimeout(() => { p.download('clean'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
         });
         setTimeout(() => {
@@ -1256,7 +1255,7 @@ async function downloadAll() {
             const imageData = p.getImageForDownload();
             const cleanImageData = p.state.cleanImageData;
             if (!imageData) {
-                updateProgress(completed.count += 3, totalItems);
+                updateProgress(completed.count += 2, totalItems);
                 resolve(false);
                 return;
             }
@@ -1309,47 +1308,6 @@ async function downloadAll() {
                 const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
                 const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
                 if (blob) folder.file(`${userPrefix}R_${filename}`, blob);
-                updateProgress(++completed.count, totalItems);
-            }
-
-            // 處理鏡射版本 (M_)
-            if (cleanImageData) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = cleanImageData.width;
-                tempCanvas.height = cleanImageData.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(cleanImageData, 0, 0);
-
-                if (STATE.enableSharpen) {
-                    const sharpened = applySharpen(tempCanvas, tempCtx);
-                    tempCtx.putImageData(sharpened, 0, 0);
-                }
-
-                let outputCanvas = tempCanvas;
-                if (preset) {
-                    let targetW = isLandscape ? 1920 : 1080;
-                    let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') { targetW = isLandscape ? 1280 : 720; targetH = isLandscape ? 720 : 1280; }
-                    const resized = document.createElement('canvas');
-                    resized.width = targetW; resized.height = targetH;
-                    resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
-                    outputCanvas = resized;
-                }
-
-                p.applyHorizontalMirror(outputCanvas);
-
-                let filename = `${nameParts.join('.')}${suffix}${ext}`;
-                let fullName = `${userPrefix}M_${filename}`;
-                if (usedNames.has(fullName)) {
-                    let counter = 1;
-                    while (usedNames.has(`${userPrefix}M_${nameParts.join('.')}_${counter}${suffix}${ext}`)) counter++;
-                    filename = `${nameParts.join('.')}_${counter}${suffix}${ext}`;
-                }
-                usedNames.add(`${userPrefix}M_${filename}`);
-
-                const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-                const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
-                if (blob) folder.file(`${userPrefix}M_${filename}`, blob);
                 updateProgress(++completed.count, totalItems);
             }
 
@@ -1409,10 +1367,9 @@ async function downloadAll() {
         console.error('ZIP generation failed:', err);
         alert('建立 ZIP 失敗，已改為個別下載。');
         STATE.processors.forEach((p, i) => {
-            let delay = i * 600;
+            let delay = i * 400;
             setTimeout(() => p.download('normal'), delay);
-            setTimeout(() => p.download('mirror'), delay + 200);
-            setTimeout(() => p.download('clean'), delay + 400);
+            setTimeout(() => p.download('clean'), delay + 200);
         });
     } finally {
         if (btn) {
