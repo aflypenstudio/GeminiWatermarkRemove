@@ -2016,8 +2016,9 @@ const Lightbox = {
     // ===== 輔助方法 =====
 
     applyTransform() {
-        const { scale, flipH, flipV, rotation, panX, panY } = this.state;
+        const { scale, flipH, flipV, rotation } = this.state;
         const img = this.elements.img;
+        const { panX, panY } = this;
 
         console.log('applyTransform:', { scale, flipH, flipV, rotation, panX, panY });
 
