@@ -1,15 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Gemini Watermark Remover",
+  "productName": "Banana Watermark Remover",
   "version": "1.0.0",
-  "identifier": "com.gemini.watermark.remover",
+  "identifier": "com.aflypenstudio.banana-watermark-remover",
   "build": {
-    "frontendDist": "../dist"
+    "frontendDist": "../"
   },
   "app": {
     "windows": [
       {
-        "title": "Gemini Watermark Remover",
+        "title": "巴娜娜去水印&微調器 - Banana Watermark Remover",
         "width": 1200,
         "height": 800,
         "resizable": true,

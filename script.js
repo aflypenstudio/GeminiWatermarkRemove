@@ -1688,28 +1688,45 @@ const Lightbox = {
     elements: {
         modal: document.getElementById('lightbox'),
         img: document.getElementById('lightboxImage'),
+        container: document.getElementById('lightboxImageContainer'),
         close: document.querySelector('.lightbox-close'),
         prev: document.getElementById('lightboxPrev'),
         next: document.getElementById('lightboxNext')
     },
     activeOriginal: null,
     activeProcessed: null,
-    currentIndex: -1,  // 當前顯示圖片的索引
+    currentIndex: -1,
+
+    // 縮放/鏡射/旋轉狀態
+    state: {
+        scale: 1,
+        flipH: false,
+        flipV: false,
+        rotation: 0 // 0, 90, 180, 270
+    },
+
+    // 平移相關
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    panX: 0,
+    panY: 0,
 
     /**
      * 初始化 Lightbox 控制器
-     * 綁定關閉、導航箭頭與鍵盤事件
      */
     init() {
-        console.log('Lightbox initializing, modal found:', !!this.elements.modal);
         if (!this.elements.modal) return;
 
         this.elements.close.onclick = () => this.close();
         this.elements.modal.onclick = (e) => {
-            if (e.target === this.elements.modal) this.close();
+            // 點擊空白處關閉（但不包括圖片容器和工具列）
+            if (e.target === this.elements.modal || e.target === this.elements.container) {
+                this.close();
+            }
         };
 
-        // 導航箭頭點擊事件
+        // 導航箭頭
         if (this.elements.prev) {
             this.elements.prev.onclick = (e) => {
                 e.stopPropagation();
@@ -1723,59 +1740,153 @@ const Lightbox = {
             };
         }
 
-        // 鍵盤事件：Escape 關閉, 左右方向鍵導航
-        document.addEventListener('keydown', (e) => {
-            if (this.elements.modal.style.display !== 'flex') return;
+        // 滾輪縮放
+        this.elements.container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            this.zoom(delta, e.clientX, e.clientY);
+        }, { passive: false });
 
-            if (e.key === 'Escape') {
-                this.close();
-            } else if (e.key === 'ArrowLeft') {
-                this.navigate(-1);
-            } else if (e.key === 'ArrowRight') {
-                this.navigate(1);
+        // 拖曳平移
+        this.elements.container.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.lightbox-nav')) return;
+            if (this.state.scale > 1) {
+                this.startDrag(e.clientX, e.clientY);
             }
         });
 
-        // Long Press comparison in Lightbox
-        const start = (e) => {
-            if (e.type === 'mousedown' && e.button !== 0) return;
-            if (this.activeOriginal) {
-                this.elements.img.src = this.activeOriginal.src;
+        this.elements.container.addEventListener('mousemove', (e) => {
+            if (this.isDragging) {
+                this.drag(e.clientX, e.clientY);
             }
+        });
+
+        this.elements.container.addEventListener('mouseup', () => this.endDrag());
+        this.elements.container.addEventListener('mouseleave', () => this.endDrag());
+
+        // 觸控平移
+        let lastTouchDist = 0;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+
+        this.elements.container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1 && this.state.scale > 1) {
+                this.startDrag(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length === 2) {
+                lastTouchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+            }
+            lastTouchX = e.touches[0].clientX;
+            lastTouchY = e.touches[0].clientY;
+        }, { passive: true });
+
+        this.elements.container.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scaleDelta = (dist - lastTouchDist) / 200;
+                this.zoom(scaleDelta, window.innerWidth / 2, window.innerHeight / 2);
+                lastTouchDist = dist;
+            }
+        }, { passive: false });
+
+        this.elements.container.addEventListener('touchend', () => this.endDrag());
+
+        // 鍵盤快捷鍵
+        document.addEventListener('keydown', (e) => {
+            if (this.elements.modal.style.display !== 'flex') return;
+
+            switch (e.key) {
+                case 'Escape':
+                    this.close();
+                    break;
+                case 'ArrowLeft':
+                    this.navigate(-1);
+                    break;
+                case 'ArrowRight':
+                    this.navigate(1);
+                    break;
+                case '+':
+                case '=':
+                    this.zoomIn();
+                    break;
+                case '-':
+                    this.zoomOut();
+                    break;
+                case '0':
+                    this.zoomReset();
+                    break;
+                case 'h':
+                case 'H':
+                    this.flipHorizontal();
+                    break;
+                case 'v':
+                case 'V':
+                    this.flipVertical();
+                    break;
+                case 'q':
+                case 'Q':
+                    this.rotateLeft();
+                    break;
+                case 'e':
+                case 'E':
+                    this.rotateRight();
+                    break;
+            }
+        });
+
+        // 长按显示原图
+        let pressTimer;
+        const startCompare = (e) => {
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            pressTimer = setTimeout(() => {
+                if (this.activeOriginal && !e.target.closest('.lightbox-toolbar') && !e.target.closest('.lightbox-nav')) {
+                    this.elements.img.src = this.activeOriginal.src;
+                }
+            }, 300);
         };
-        const end = (e) => {
+        const endCompare = () => {
+            clearTimeout(pressTimer);
             if (this.activeProcessed) {
                 this.elements.img.src = this.activeProcessed;
             }
         };
 
-        this.elements.img.addEventListener('mousedown', start);
-        this.elements.img.addEventListener('touchstart', start);
-        this.elements.img.addEventListener('mouseup', end);
-        this.elements.img.addEventListener('touchend', end);
-        this.elements.img.addEventListener('mouseleave', end);
+        this.elements.container.addEventListener('mousedown', startCompare);
+        this.elements.container.addEventListener('touchstart', startCompare);
+        this.elements.container.addEventListener('mouseup', endCompare);
+        this.elements.container.addEventListener('touchend', endCompare);
+        this.elements.container.addEventListener('mouseleave', endCompare);
+
+        // 工具列按鈕
+        document.getElementById('lightboxZoomIn')?.addEventListener('click', () => this.zoomIn());
+        document.getElementById('lightboxZoomOut')?.addEventListener('click', () => this.zoomOut());
+        document.getElementById('lightboxZoomReset')?.addEventListener('click', () => this.zoomReset());
+        document.getElementById('lightboxFlipH')?.addEventListener('click', () => this.flipHorizontal());
+        document.getElementById('lightboxFlipV')?.addEventListener('click', () => this.flipVertical());
+        document.getElementById('lightboxRotateL')?.addEventListener('click', () => this.rotateLeft());
+        document.getElementById('lightboxRotateR')?.addEventListener('click', () => this.rotateRight());
     },
 
     /**
-     * 開啟 Lightbox 顯示圖片
-     * @param {ImageData} processedImageData - 處理後的圖片資料
-     * @param {HTMLImageElement} originalImage - 原始圖片
-     * @param {ImageProcessor} processor - 圖片處理器實例（用於確定索引）
+     * 開啟 Lightbox
      */
     open(processedImageData, originalImage, processor) {
         if (!processedImageData || !originalImage) return;
 
-        // 找到當前圖片在 processors 陣列中的索引
         if (processor) {
             this.currentIndex = STATE.processors.indexOf(processor);
         } else {
             this.currentIndex = -1;
         }
 
-        // Clone/Store original
         this.activeOriginal = originalImage;
 
-        // Convert Processed ImageData to DataURL for <img>
         const canvas = document.createElement('canvas');
         canvas.width = processedImageData.width;
         canvas.height = processedImageData.height;
@@ -1783,82 +1894,53 @@ const Lightbox = {
         ctx.putImageData(processedImageData, 0, 0);
         this.activeProcessed = canvas.toDataURL();
 
-        // Set content
+        // 重置狀態
+        this.resetState();
+
         this.elements.img.src = this.activeProcessed;
         this.elements.modal.style.display = 'flex';
 
-        // 更新導航箭頭顯示狀態
         this.updateNavVisibility();
+        this.updateToolbarState();
+        this.applyTransform();
     },
 
     /**
-     * 導航到上一張或下一張圖片
-     * @param {number} direction - -1 表示上一張，1 表示下一張
+     * 導航
      */
     navigate(direction) {
         const total = STATE.processors.length;
         if (total <= 1) return;
 
         const newIndex = this.currentIndex + direction;
-
-        // 邊界檢查
         if (newIndex < 0 || newIndex >= total) return;
 
         const targetProcessor = STATE.processors[newIndex];
         if (!targetProcessor || !targetProcessor.state.processedImageData) return;
 
-        // 更新當前索引
         this.currentIndex = newIndex;
-
-        // 更新顯示的圖片
-        this.activeOriginal = targetProcessor.state.originalImage;
 
         const canvas = document.createElement('canvas');
         canvas.width = targetProcessor.state.processedImageData.width;
         canvas.height = targetProcessor.state.processedImageData.height;
         const ctx = canvas.getContext('2d');
         ctx.putImageData(targetProcessor.state.processedImageData, 0, 0);
+
+        this.activeOriginal = targetProcessor.state.originalImage;
         this.activeProcessed = canvas.toDataURL();
+
+        // 重置狀態
+        this.resetState();
 
         this.elements.img.src = this.activeProcessed;
 
-        // 更新導航箭頭顯示狀態
         this.updateNavVisibility();
+        this.updateToolbarState();
+        this.applyTransform();
     },
 
     /**
-     * 更新導航箭頭的顯示狀態
-     * 第一張只顯示右箭頭，最後一張只顯示左箭頭
-     */
-    updateNavVisibility() {
-        const total = STATE.processors.length;
-
-        if (!this.elements.prev || !this.elements.next) return;
-
-        // 只有一張或沒有圖片時，隱藏所有箭頭
-        if (total <= 1) {
-            this.elements.prev.classList.add('hidden');
-            this.elements.next.classList.add('hidden');
-            return;
-        }
-
-        // 第一張：隱藏左箭頭
-        if (this.currentIndex <= 0) {
-            this.elements.prev.classList.add('hidden');
-        } else {
-            this.elements.prev.classList.remove('hidden');
-        }
-
-        // 最後一張：隱藏右箭頭
-        if (this.currentIndex >= total - 1) {
-            this.elements.next.classList.add('hidden');
-        } else {
-            this.elements.next.classList.remove('hidden');
-        }
-    },
-
-    /**
-     * 關閉 Lightbox
+     * 關閉
      */
     close() {
         this.elements.modal.style.display = 'none';
@@ -1866,6 +1948,175 @@ const Lightbox = {
         this.activeOriginal = null;
         this.activeProcessed = null;
         this.currentIndex = -1;
+        this.resetState();
+    },
+
+    // ===== 縮放控制 =====
+
+    zoom(delta, clientX, clientY) {
+        const newScale = Math.max(0.5, Math.min(5, this.state.scale + delta));
+        if (newScale !== this.state.scale) {
+            this.state.scale = newScale;
+            this.applyTransform();
+            this.updateZoomIndicator();
+        }
+    },
+
+    zoomIn() {
+        this.zoom(0.25, window.innerWidth / 2, window.innerHeight / 2);
+    },
+
+    zoomOut() {
+        this.zoom(-0.25, window.innerWidth / 2, window.innerHeight / 2);
+    },
+
+    zoomReset() {
+        this.state.scale = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.applyTransform();
+        this.updateZoomIndicator();
+        this.showToast(Localization.get('zoomReset') || '重置');
+    },
+
+    // ===== 鏡射控制 =====
+
+    flipHorizontal() {
+        this.state.flipH = !this.state.flipH;
+        this.applyTransform();
+        this.updateToolbarState();
+        this.updateNavVisibility();
+        this.showToast(Localization.get('flipHHint') + (this.state.flipH ? ': ON' : ': OFF'));
+    },
+
+    flipVertical() {
+        this.state.flipV = !this.state.flipV;
+        this.applyTransform();
+        this.updateToolbarState();
+        this.updateNavVisibility();
+        this.showToast(Localization.get('flipVHint') + (this.state.flipV ? ': ON' : ': OFF'));
+    },
+
+    // ===== 旋轉控制 =====
+
+    rotateLeft() {
+        this.state.rotation = (this.state.rotation - 90 + 360) % 360;
+        this.applyTransform();
+        this.updateNavVisibility();
+        this.showToast(Localization.get('rotateHint') + ': -90°');
+    },
+
+    rotateRight() {
+        this.state.rotation = (this.state.rotation + 90) % 360;
+        this.applyTransform();
+        this.updateNavVisibility();
+        this.showToast(Localization.get('rotateHint') + ': +90°');
+    },
+
+    // ===== 輔助方法 =====
+
+    applyTransform() {
+        const { scale, flipH, flipV, rotation, panX, panY } = this.state;
+        const img = this.elements.img;
+
+        let transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        transform += ` scaleX(${flipH ? -1 : 1}) scaleY(${flipV ? -1 : 1})`;
+        transform += ` rotate(${rotation}deg)`;
+
+        img.style.transform = transform;
+    },
+
+    resetState() {
+        this.state = {
+            scale: 1,
+            flipH: false,
+            flipV: false,
+            rotation: 0
+        };
+        this.panX = 0;
+        this.panY = 0;
+        this.isDragging = false;
+    },
+
+    startDrag(x, y) {
+        this.isDragging = true;
+        this.dragStartX = x - this.panX;
+        this.dragStartY = y - this.panY;
+        this.elements.img.classList.add('panning');
+    },
+
+    drag(x, y) {
+        if (!this.isDragging) return;
+        this.panX = x - this.dragStartX;
+        this.panY = y - this.dragStartY;
+        this.applyTransform();
+    },
+
+    endDrag() {
+        this.isDragging = false;
+        this.elements.img.classList.remove('panning');
+    },
+
+    updateNavVisibility() {
+        const total = STATE.processors.length;
+        if (!this.elements.prev || !this.elements.next) return;
+
+        if (total <= 1) {
+            this.elements.prev.classList.add('hidden');
+            this.elements.next.classList.add('hidden');
+            return;
+        }
+
+        if (this.currentIndex <= 0) {
+            this.elements.prev.classList.add('hidden');
+        } else {
+            this.elements.prev.classList.remove('hidden');
+        }
+
+        if (this.currentIndex >= total - 1) {
+            this.elements.next.classList.add('hidden');
+        } else {
+            this.elements.next.classList.remove('hidden');
+        }
+
+        // 根據旋轉角度和縮放調整箭頭位置
+        const container = this.elements.container;
+        const isRotated = this.state.rotation === 90 || this.state.rotation === 270;
+
+        this.elements.prev.style.top = '50%';
+        this.elements.next.style.top = '50%';
+    },
+
+    updateToolbarState() {
+        document.getElementById('lightboxFlipH')?.classList.toggle('active', this.state.flipH);
+        document.getElementById('lightboxFlipV')?.classList.toggle('active', this.state.flipV);
+
+        // 更新縮放顯示
+        const zoomBtn = document.getElementById('lightboxZoomReset');
+        if (zoomBtn) {
+            zoomBtn.querySelector('span').textContent = Math.round(this.state.scale * 100) + '%';
+        }
+    },
+
+    updateZoomIndicator() {
+        this.updateToolbarState();
+    },
+
+    showToast(message) {
+        let toast = document.querySelector('.lightbox-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'lightbox-toast';
+            this.elements.modal.appendChild(toast);
+        }
+
+        toast.textContent = message;
+        toast.classList.add('show');
+
+        clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 1500);
     }
 };
 

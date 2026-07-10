@@ -240,20 +240,77 @@
 
     <!-- Lightbox -->
     <div id="lightbox" class="lightbox">
-        <span class="lightbox-close">&times;</span>
-        <!-- 導航箭頭 -->
-        <span id="lightboxPrev" class="lightbox-nav lightbox-prev" title="上一張">
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-        </span>
-        <span id="lightboxNext" class="lightbox-nav lightbox-next" title="下一張">
-            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-        </span>
-        <img class="lightbox-content" id="lightboxImage">
-        <div class="lightbox-caption" data-i18n="lightboxCaption">長按顯示原圖</div>
+        <span class="lightbox-close" title="關閉 (Esc)">&times;</span>
+
+        <!-- 工具列 -->
+        <div class="lightbox-toolbar">
+            <!-- 縮放控制 -->
+            <button class="lightbox-tool-btn" id="lightboxZoomIn" title="放大 (+)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                </svg>
+            </button>
+            <button class="lightbox-tool-btn" id="lightboxZoomOut" title="縮小 (-)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                </svg>
+            </button>
+            <button class="lightbox-tool-btn" id="lightboxZoomReset" title="重置縮放 (0)">
+                <span style="font-size: 14px; font-weight: 600;">100%</span>
+            </button>
+
+            <span class="lightbox-toolbar-divider"></span>
+
+            <!-- 鏡射控制 -->
+            <button class="lightbox-tool-btn" id="lightboxFlipH" title="水平鏡射 (H)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                </svg>
+            </button>
+            <button class="lightbox-tool-btn" id="lightboxFlipV" title="垂直鏡射 (V)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                </svg>
+            </button>
+
+            <span class="lightbox-toolbar-divider"></span>
+
+            <!-- 順時針/逆時針旋轉 -->
+            <button class="lightbox-tool-btn" id="lightboxRotateL" title="向左旋轉 (Q)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </button>
+            <button class="lightbox-tool-btn" id="lightboxRotateR" title="向右旋轉 (E)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m0 0a8.001 8.001 0 0115.356 2M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- 主圖片區域（用於縮放和平移） -->
+        <div class="lightbox-image-container" id="lightboxImageContainer">
+            <!-- 導航箭頭 -->
+            <span id="lightboxPrev" class="lightbox-nav lightbox-prev" title="上一張 (←)">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </span>
+            <span id="lightboxNext" class="lightbox-nav lightbox-next" title="下一張 (→)">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </span>
+
+            <!-- 圖片 -->
+            <img class="lightbox-content" id="lightboxImage">
+        </div>
+
+        <!-- 底部說明 -->
+        <div class="lightbox-caption">
+            <span data-i18n="lightboxCaption">長按顯示原圖</span>
+            <span class="lightbox-hint"> | 長按圖片查看原始</span>
+        </div>
     </div>
 
     <!-- Tauri External Link Handler -->

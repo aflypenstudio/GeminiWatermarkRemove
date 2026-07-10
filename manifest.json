@@ -1,6 +1,6 @@
 {
-  "name": "Gemini Watermark Remover",
-  "short_name": "Antigravity",
+  "name": "Banana Watermark Remover & Adjuster",
+  "short_name": "BananaRemover",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f1115",

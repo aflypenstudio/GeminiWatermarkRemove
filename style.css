@@ -1310,58 +1310,149 @@ footer a:hover {
   display: none;
   position: fixed;
   z-index: 9999;
-  padding-top: 50px;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: auto;
-  background-color: rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(5px);
   justify-content: center;
   align-items: center;
   flex-direction: column;
 }
 
+/* Lightbox 工具列 */
+.lightbox-toolbar {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(30, 30, 35, 0.95);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1003;
+}
+
+.lightbox-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #ccc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lightbox-tool-btn:hover {
+  background: rgba(124, 58, 237, 0.4);
+  color: #fff;
+}
+
+.lightbox-tool-btn.active {
+  background: rgba(124, 58, 237, 0.6);
+  color: #fff;
+}
+
+.lightbox-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
+/* Lightbox 圖片容器（可縮放） */
+.lightbox-image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.lightbox-image-container:active {
+  cursor: grabbing;
+}
+
 .lightbox-content {
-  margin: auto;
-  display: block;
   max-width: 90%;
-  max-height: 80vh;
+  max-height: 85vh;
   object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
   user-select: none;
   -webkit-user-select: none;
+  transition: transform 0.1s ease-out;
+  transform-origin: center center;
+}
+
+/* 平移模式下的圖片 */
+.lightbox-content.panning {
+  transition: none;
 }
 
 .lightbox-caption {
-  margin: 1rem auto;
-  display: block;
-  width: 80%;
-  max-width: 700px;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #aaa;
+  font-size: 14px;
   text-align: center;
-  color: #ccc;
-  padding: 10px 0;
+}
+
+.lightbox-hint {
+  font-size: 12px;
+  color: #777;
+}
+
+.lightbox-zoom-level {
+  color: #888;
+  font-size: 13px;
+  font-family: monospace;
 }
 
 .lightbox-close {
   position: absolute;
   top: 15px;
-  right: 35px;
+  right: 20px;
   color: #f1f1f1;
-  font-size: 40px;
+  font-size: 36px;
   font-weight: bold;
-  transition: 0.3s;
+  transition: 0.2s;
   cursor: pointer;
-  z-index: 1001;
+  z-index: 1004;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(30, 30, 35, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .lightbox-close:hover,
 .lightbox-close:focus {
-  color: #bbb;
+  background: rgba(220, 50, 50, 0.8);
+  color: #fff;
   text-decoration: none;
-  cursor: pointer;
 }
 
 /* Lightbox Navigation Arrows */
@@ -1374,14 +1465,15 @@ footer a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(30, 30, 35, 0.8);
   border-radius: 50%;
   color: #fff;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   z-index: 1002;
   user-select: none;
   -webkit-user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .lightbox-nav:hover {
@@ -1402,13 +1494,74 @@ footer a:hover {
   right: 20px;
 }
 
+/* 縮放時隱藏導航箭頭（當圖片太大時） */
+.lightbox-nav.edge-hidden {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
 /* 隱藏導航箭頭的狀態 */
 .lightbox-nav.hidden {
   display: none !important;
 }
 
+/* 縮放指示器 */
+.lightbox-zoom-indicator {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-family: monospace;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.lightbox-zoom-indicator.show {
+  opacity: 1;
+}
+
+/* 提示訊息 */
+.lightbox-toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(124, 58, 237, 0.9);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.lightbox-toast.show {
+  opacity: 1;
+}
+
 /* 響應式設計：手機版 */
 @media (max-width: 767px) {
+  .lightbox-toolbar {
+    top: auto;
+    bottom: 70px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90%;
+  }
+
+  .lightbox-tool-btn {
+    width: 40px;
+    height: 40px;
+  }
+
   .lightbox-nav {
     width: 40px;
     height: 40px;
@@ -1425,6 +1578,14 @@ footer a:hover {
 
   .lightbox-next {
     right: 10px;
+  }
+
+  .lightbox-close {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    font-size: 28px;
   }
 }
 
