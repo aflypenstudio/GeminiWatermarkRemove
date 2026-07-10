@@ -1931,15 +1931,26 @@ const Lightbox = {
 
         // 儲存原始設定用於取消
         this._settingsBackup = {
-            strength: parseFloat(document.getElementById('settingsStrength').value),
-            position: document.querySelector('input[name="settingsPosition"]:checked').value,
-            size: document.querySelector('input[name="settingsSize"]:checked').value
+            alphaGain: processor.config.alphaGain,
+            autoStrength: processor.config.autoStrength,
+            forcePosition: processor.config.forcePosition,
+            forceMode: processor.config.forceMode
         };
 
         panel.classList.add('visible');
     },
 
     closeSettingsPanel() {
+        // 如果有未儲存的變更，恢復原設定
+        const processor = this.currentIndex >= 0 ? STATE.processors[this.currentIndex] : null;
+        if (this._settingsBackup && processor) {
+            processor.config.alphaGain = this._settingsBackup.alphaGain;
+            processor.config.autoStrength = this._settingsBackup.autoStrength;
+            processor.config.forcePosition = this._settingsBackup.forcePosition;
+            processor.config.forceMode = this._settingsBackup.forceMode;
+            this.updateMainUIControls(processor);
+        }
+
         const panel = document.getElementById('lightboxSettingsPanel');
         panel?.classList.remove('visible');
     },
@@ -1956,11 +1967,39 @@ const Lightbox = {
     },
 
     cancelSettings() {
+        const processor = this.currentIndex >= 0 ? STATE.processors[this.currentIndex] : null;
+
         // 恢復原設定
-        if (this._settingsBackup) {
-            // 不做任何變更
+        if (this._settingsBackup && processor) {
+            processor.config.alphaGain = this._settingsBackup.alphaGain;
+            processor.config.autoStrength = this._settingsBackup.autoStrength;
+            processor.config.forcePosition = this._settingsBackup.forcePosition;
+            processor.config.forceMode = this._settingsBackup.forceMode;
+
+            // 更新主畫面控制項
+            this.updateMainUIControls(processor);
         }
+
         this.closeSettingsPanel();
+    },
+
+    updateMainUIControls(processor) {
+        if (!processor || !processor.elements.card) return;
+
+        // 更新大小選擇
+        if (processor.elements.sizeSelect) {
+            processor.elements.sizeSelect.value = processor.config.forceMode || 'auto';
+        }
+
+        // 更新位置選擇
+        if (processor.elements.positionSelect) {
+            processor.elements.positionSelect.value = processor.config.forcePosition || 'auto';
+        }
+
+        // 更新自動強度檢查框
+        if (processor.elements.autoStrengthCheck) {
+            processor.elements.autoStrengthCheck.checked = processor.config.autoStrength;
+        }
     },
 
     applySettings() {
