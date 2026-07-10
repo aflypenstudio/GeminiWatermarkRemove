@@ -30,16 +30,10 @@ const fileInput = document.getElementById('fileInput');
 const resultsContainer = document.getElementById('resultsContainer');
 const globalActions = document.getElementById('globalActions');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
-const downloadCleanBtn = document.getElementById('downloadCleanBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const batchProgress = document.getElementById('batchProgress');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
-
-// Batch download type checkboxes
-const batchIncludeN = document.getElementById('batchIncludeN');
-const batchIncludeR = document.getElementById('batchIncludeR');
-const batchIncludeM = document.getElementById('batchIncludeM');
 
 // New Option Elements
 const keepExifCheckbox = document.getElementById('keepExif');
@@ -522,23 +516,24 @@ class ImageProcessor {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
-                    <div class="download-with-type" style="display: flex; flex: 1; gap: 2px; align-items: center;">
-                        <label class="type-check" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 100%; background: rgba(255,255,255,0.1); border-radius: 0.5rem 0 0 0.5rem; cursor: pointer;">
-                            <input type="checkbox" class="download-type-n" title="無 Logo 水平鏡像" checked>
-                            <span style="font-size: 0.75rem; font-weight: 600;">N</span>
-                        </label>
-                        <label class="type-check" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 100%; background: rgba(255,255,255,0.05); cursor: pointer;">
-                            <input type="checkbox" class="download-type-r" title="含 Logo 版本">
-                            <span style="font-size: 0.75rem; font-weight: 600;">R</span>
-                        </label>
-                        <label class="type-check" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 100%; background: rgba(255,255,255,0.05); cursor: pointer; border-radius: 0;">
-                            <input type="checkbox" class="download-type-m" title="鏡像版本（無 Logo）">
-                            <span style="font-size: 0.75rem; font-weight: 600;">M</span>
-                        </label>
-                        <button class="btn btn-primary download-btn" disabled style="border-radius: 0 0.5rem 0.5rem 0; padding: 0.5rem; flex: 1;">
-                            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <div class="download-buttons" style="display: flex; flex: 1; gap: 2px;">
+                        <button class="btn btn-secondary download-normal-btn" title="${Localization.get('downloadNormal') || '一般下載'}">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                             </svg>
+                            <span>${Localization.get('downloadNormal') || '一般'}</span>
+                        </button>
+                        <button class="btn btn-secondary download-mirror-btn" title="${Localization.get('downloadMirror') || '鏡射下載'}">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                            <span>${Localization.get('downloadMirror') || '鏡射'}</span>
+                        </button>
+                        <button class="btn btn-secondary download-clean-btn" title="${Localization.get('downloadClean') || '純淨下載'}">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>${Localization.get('downloadClean') || '純淨'}</span>
                         </button>
                     </div>
                 </div>
@@ -559,17 +554,18 @@ class ImageProcessor {
         this.elements.alphaInput = card.querySelector('input[type="range"]');
         this.elements.alphaValue = card.querySelector('.alpha-value');
         this.elements.autoStrengthCheck = card.querySelector('.auto-strength-check');
-        this.elements.downloadBtn = card.querySelector('.download-btn');
-        this.elements.typeN = card.querySelector('.download-type-n');
-        this.elements.typeR = card.querySelector('.download-type-r');
-        this.elements.typeM = card.querySelector('.download-type-m');
+        this.elements.downloadNormalBtn = card.querySelector('.download-normal-btn');
+        this.elements.downloadMirrorBtn = card.querySelector('.download-mirror-btn');
+        this.elements.downloadCleanBtn = card.querySelector('.download-clean-btn');
         this.elements.removeBtn = card.querySelector('.remove-btn');
         this.elements.compareBtn = card.querySelector('.compare-btn');
         this.elements.wrapper = card.querySelector('.image-wrapper');
         this.elements.compareOverlay = card.querySelector('.comparison-overlay'); // Added ref
 
-        // Update checkbox visual state
-        this.updateTypeCheckboxStyles();
+        // Initially disable download buttons until processing is done
+        this.elements.downloadNormalBtn.disabled = true;
+        this.elements.downloadMirrorBtn.disabled = true;
+        this.elements.downloadCleanBtn.disabled = true;
 
         // Bind Events
         this.elements.sizeSelect.addEventListener('change', (e) => {
@@ -603,19 +599,17 @@ class ImageProcessor {
             this.processAndRender();
         });
 
-        this.elements.downloadBtn.addEventListener('click', () => {
-            const typeN = this.elements.typeN.checked;
-            const typeR = this.elements.typeR.checked;
-            const typeM = this.elements.typeM.checked;
-            if (typeN) this.download('N');
-            if (typeR) this.download('R');
-            if (typeM) this.download('M');
+        // Download button event listeners
+        this.elements.downloadNormalBtn.addEventListener('click', () => {
+            this.download('normal');
+        });
+        this.elements.downloadMirrorBtn.addEventListener('click', () => {
+            this.download('mirror');
+        });
+        this.elements.downloadCleanBtn.addEventListener('click', () => {
+            this.download('clean');
         });
 
-        // Type checkbox toggle handlers
-        this.elements.typeN.addEventListener('change', () => this.updateTypeCheckboxStyles());
-        this.elements.typeR.addEventListener('change', () => this.updateTypeCheckboxStyles());
-        this.elements.typeM.addEventListener('change', () => this.updateTypeCheckboxStyles());
         this.elements.removeBtn.addEventListener('click', () => this.destroy());
 
         // Comparison interactions
@@ -837,7 +831,9 @@ class ImageProcessor {
         // Update State
         this.state.processedImageData = finalImageData;
         this.elements.loading.style.display = 'none';
-        this.elements.downloadBtn.disabled = false;
+        this.elements.downloadNormalBtn.disabled = false;
+        this.elements.downloadMirrorBtn.disabled = false;
+        this.elements.downloadCleanBtn.disabled = false;
     }
 
     /**
@@ -970,9 +966,9 @@ class ImageProcessor {
 
     /**
      * 下載圖片
-     * @param {string} downloadType - 'N' = clean version (no logo, horizontal mirror), 'R' = with logo, 'M' = clean mirrored version
+     * @param {string} downloadType - 'normal' = 去水印+縮小+有Logo / 'mirror' = 去水印+縮小+鏡射 / 'clean' = 去水印+縮小
      */
-    download(downloadType = 'N') {
+    download(downloadType = 'normal') {
         const imageData = this.getImageForDownload();
         if (!imageData) return;
 
@@ -987,10 +983,10 @@ class ImageProcessor {
         const tempCtx = tempCanvas.getContext('2d');
 
         // 決定使用哪個 ImageData 作為來源
-        // 'R' = imageData (有 Logo)
-        // 'N' 或 'M' = cleanImageData (無 Logo)
+        // 'normal' = imageData (有 Logo)
+        // 'mirror' 或 'clean' = cleanImageData (無 Logo)
         let sourceImageData;
-        if (downloadType === 'R') {
+        if (downloadType === 'normal') {
             sourceImageData = imageData; // 有 Logo 版本
         } else {
             sourceImageData = this.state.cleanImageData || imageData; // 無 Logo
@@ -1029,13 +1025,13 @@ class ImageProcessor {
         }
 
         // 如果需要且有自訂 LOGO，在縮放後的 canvas 上套用 LOGO（基於縮放後尺寸計算位置）
-        // 只有 R 版本需要套用 Logo
-        if (downloadType === 'R' && STATE.customLogo.image) {
+        // 只有 normal 版本需要套用 Logo
+        if (downloadType === 'normal' && STATE.customLogo.image) {
             this.applyCustomLogoToCanvas(outputCanvas);
         }
 
-        // 套用水平鏡像（針對 M 和 N 版本）
-        if (downloadType === 'N' || downloadType === 'M') {
+        // 套用水平鏡像（只有 mirror 版本）
+        if (downloadType === 'mirror') {
             this.applyHorizontalMirror(outputCanvas);
         }
 
@@ -1057,8 +1053,15 @@ class ImageProcessor {
             // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
 
-            // 下載類型前綴：N_ = 鏡像無Logo / R_ = 含Logo / M_ = 鏡像無Logo
-            const typePrefix = `${downloadType}_`;
+            // 下載類型前綴
+            let typePrefix;
+            if (downloadType === 'normal') {
+                typePrefix = 'R_';
+            } else if (downloadType === 'mirror') {
+                typePrefix = 'M_';
+            } else {
+                typePrefix = 'N_';
+            }
             link.download = `${userPrefix}${typePrefix}${nameParts.join('.')}${suffix}${ext}`;
 
             link.href = url;
@@ -1208,21 +1211,10 @@ window.addEventListener('paste', (e) => {
 // =============================================================================
 
 /**
- * 批次下載所有圖片
+ * 批次下載所有圖片（包含三個版本）
  */
 async function downloadAll() {
     if (STATE.processors.length === 0) return;
-
-    // 取得批次下載類型設定
-    const includeN = batchIncludeN ? batchIncludeN.checked : false;
-    const includeR = batchIncludeR ? batchIncludeR.checked : false;
-    const includeM = batchIncludeM ? batchIncludeM.checked : false;
-
-    // 檢查是否至少選擇了一種類型
-    if (!includeN && !includeR && !includeM) {
-        alert(Localization.get('selectDownloadType') || '請至少選擇一種下載類型');
-        return;
-    }
 
     // 禁用按鈕並顯示進度條
     const btn = downloadAllBtn;
@@ -1232,35 +1224,16 @@ async function downloadAll() {
     }
     if (batchProgress) batchProgress.style.display = 'flex';
 
+    const totalItems = STATE.processors.length * 3; // 3 types each
+
     // 無 JSZip 時降級到依序下載
     if (typeof JSZip === 'undefined') {
         let delay = 0;
-        const typesCount = (includeN ? 1 : 0) + (includeR ? 1 : 0) + (includeM ? 1 : 0);
-        const totalItems = STATE.processors.length * typesCount;
         let itemIndex = 0;
-
-        STATE.processors.forEach((p, i) => {
-            if (includeN) {
-                setTimeout(() => {
-                    p.download('N');
-                    updateProgress(++itemIndex, totalItems);
-                }, delay);
-                delay += 300;
-            }
-            if (includeR) {
-                setTimeout(() => {
-                    p.download('R');
-                    updateProgress(++itemIndex, totalItems);
-                }, delay);
-                delay += 300;
-            }
-            if (includeM) {
-                setTimeout(() => {
-                    p.download('M');
-                    updateProgress(++itemIndex, totalItems);
-                }, delay);
-                delay += 300;
-            }
+        STATE.processors.forEach((p) => {
+            setTimeout(() => { p.download('normal'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
+            setTimeout(() => { p.download('mirror'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
+            setTimeout(() => { p.download('clean'); updateProgress(++itemIndex, totalItems); }, delay); delay += 200;
         });
         setTimeout(() => {
             if (btn) {
@@ -1269,7 +1242,6 @@ async function downloadAll() {
                 Localization.apply();
             }
             if (batchProgress) batchProgress.style.display = 'none';
-            Localization.apply();
         }, delay + 1000);
         return;
     }
@@ -1277,17 +1249,14 @@ async function downloadAll() {
     const zip = new JSZip();
     const folder = zip.folder('banana_clean');
     const usedNames = new Set();
+    const completed = { count: 0 };
 
     try {
-        const typesCount = (includeN ? 1 : 0) + (includeR ? 1 : 0) + (includeM ? 1 : 0);
-        const total = STATE.processors.length * typesCount;
-        const completed = { count: 0 };
-
         const promises = STATE.processors.map(p => new Promise(async (resolve) => {
             const imageData = p.getImageForDownload();
             const cleanImageData = p.state.cleanImageData;
             if (!imageData) {
-                updateProgress(completed.count += typesCount, total);
+                updateProgress(completed.count += 3, totalItems);
                 resolve(false);
                 return;
             }
@@ -1297,175 +1266,130 @@ async function downloadAll() {
             const ext = format === 'jpeg' ? '.jpg' : '.png';
             const preset = STATE.resizePreset;
             const isLandscape = imageData.width > imageData.height;
-
-            // 優先從 DOM 讀取，確保獲取最新值
             const userPrefix = (filenamePrefixInput ? filenamePrefixInput.value : STATE.filenamePrefix) || '';
             const nameParts = p.file.name.split('.');
             nameParts.pop();
             const suffix = '_clean';
-            const baseFilename = `${nameParts.join('.')}${suffix}${ext}`;
 
-            // 處理 R 版本（含 Logo）
-            if (includeR) {
+            // 處理一般版本 (R_)
+            {
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = imageData.width;
                 tempCanvas.height = imageData.height;
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.putImageData(imageData, 0, 0);
 
-                // 銳化
                 if (STATE.enableSharpen) {
                     const sharpened = applySharpen(tempCanvas, tempCtx);
                     tempCtx.putImageData(sharpened, 0, 0);
                 }
 
-                // 縮放
                 let outputCanvas = tempCanvas;
                 if (preset) {
                     let targetW = isLandscape ? 1920 : 1080;
                     let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') {
-                        targetW = isLandscape ? 1280 : 720;
-                        targetH = isLandscape ? 720 : 1280;
-                    }
+                    if (preset === '1280x720') { targetW = isLandscape ? 1280 : 720; targetH = isLandscape ? 720 : 1280; }
                     const resized = document.createElement('canvas');
-                    resized.width = targetW;
-                    resized.height = targetH;
+                    resized.width = targetW; resized.height = targetH;
                     resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
                     outputCanvas = resized;
                 }
 
-                // 套用 Logo
-                if (STATE.customLogo.image) {
-                    p.applyCustomLogoToCanvas(outputCanvas);
-                }
+                if (STATE.customLogo.image) p.applyCustomLogoToCanvas(outputCanvas);
 
-                // 處理檔名衝突
-                let rFilename = baseFilename;
-                const fullName = `${userPrefix}R_${rFilename}`;
+                let filename = `${nameParts.join('.')}${suffix}${ext}`;
+                let fullName = `${userPrefix}R_${filename}`;
                 if (usedNames.has(fullName)) {
                     let counter = 1;
-                    const basePart = rFilename.substring(0, rFilename.lastIndexOf(suffix));
-                    while (usedNames.has(`${userPrefix}R_${basePart}_${counter}${suffix}${ext}`)) {
-                        counter++;
-                    }
-                    rFilename = `${basePart}_${counter}${suffix}${ext}`;
+                    while (usedNames.has(`${userPrefix}R_${nameParts.join('.')}_${counter}${suffix}${ext}`)) counter++;
+                    filename = `${nameParts.join('.')}_${counter}${suffix}${ext}`;
                 }
-                usedNames.add(`${userPrefix}R_${rFilename}`);
-                const finalRFilename = `${userPrefix}R_${rFilename}`;
+                usedNames.add(`${userPrefix}R_${filename}`);
 
                 const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-                const rBlob = await writeExifToBlob(outputCanvas, exif, mimeType);
-                if (rBlob) folder.file(finalRFilename, rBlob);
-                updateProgress(++completed.count, total);
+                const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
+                if (blob) folder.file(`${userPrefix}R_${filename}`, blob);
+                updateProgress(++completed.count, totalItems);
             }
 
-            // 處理 N 版本（無 Logo，水平鏡像）
-            if (includeN && cleanImageData) {
-                const sourceData = cleanImageData;
+            // 處理鏡射版本 (M_)
+            if (cleanImageData) {
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = sourceData.width;
-                tempCanvas.height = sourceData.height;
+                tempCanvas.width = cleanImageData.width;
+                tempCanvas.height = cleanImageData.height;
                 const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(sourceData, 0, 0);
+                tempCtx.putImageData(cleanImageData, 0, 0);
 
-                // 銳化
                 if (STATE.enableSharpen) {
                     const sharpened = applySharpen(tempCanvas, tempCtx);
                     tempCtx.putImageData(sharpened, 0, 0);
                 }
 
-                // 縮放
-                let cleanOutput = tempCanvas;
+                let outputCanvas = tempCanvas;
                 if (preset) {
                     let targetW = isLandscape ? 1920 : 1080;
                     let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') {
-                        targetW = isLandscape ? 1280 : 720;
-                        targetH = isLandscape ? 720 : 1280;
-                    }
+                    if (preset === '1280x720') { targetW = isLandscape ? 1280 : 720; targetH = isLandscape ? 720 : 1280; }
                     const resized = document.createElement('canvas');
-                    resized.width = targetW;
-                    resized.height = targetH;
+                    resized.width = targetW; resized.height = targetH;
                     resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
-                    cleanOutput = resized;
+                    outputCanvas = resized;
                 }
 
-                // 套用水平鏡像
-                p.applyHorizontalMirror(cleanOutput);
+                p.applyHorizontalMirror(outputCanvas);
 
-                // 處理檔名衝突
-                let nFilename = baseFilename;
-                const fullName = `${userPrefix}N_${nFilename}`;
+                let filename = `${nameParts.join('.')}${suffix}${ext}`;
+                let fullName = `${userPrefix}M_${filename}`;
                 if (usedNames.has(fullName)) {
                     let counter = 1;
-                    const basePart = nFilename.substring(0, nFilename.lastIndexOf(suffix));
-                    while (usedNames.has(`${userPrefix}N_${basePart}_${counter}${suffix}${ext}`)) {
-                        counter++;
-                    }
-                    nFilename = `${basePart}_${counter}${suffix}${ext}`;
+                    while (usedNames.has(`${userPrefix}M_${nameParts.join('.')}_${counter}${suffix}${ext}`)) counter++;
+                    filename = `${nameParts.join('.')}_${counter}${suffix}${ext}`;
                 }
-                usedNames.add(`${userPrefix}N_${nFilename}`);
-                const finalNFilename = `${userPrefix}N_${nFilename}`;
+                usedNames.add(`${userPrefix}M_${filename}`);
 
-                const cleanExif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-                const cleanBlob = await writeExifToBlob(cleanOutput, cleanExif, mimeType);
-                if (cleanBlob) folder.file(finalNFilename, cleanBlob);
-                updateProgress(++completed.count, total);
+                const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
+                const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
+                if (blob) folder.file(`${userPrefix}M_${filename}`, blob);
+                updateProgress(++completed.count, totalItems);
             }
 
-            // 處理 M 版本（無 Logo，水平鏡像）
-            if (includeM && cleanImageData) {
-                const sourceData = cleanImageData;
+            // 處理純淨版本 (N_)
+            if (cleanImageData) {
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = sourceData.width;
-                tempCanvas.height = sourceData.height;
+                tempCanvas.width = cleanImageData.width;
+                tempCanvas.height = cleanImageData.height;
                 const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(sourceData, 0, 0);
+                tempCtx.putImageData(cleanImageData, 0, 0);
 
-                // 銳化
                 if (STATE.enableSharpen) {
                     const sharpened = applySharpen(tempCanvas, tempCtx);
                     tempCtx.putImageData(sharpened, 0, 0);
                 }
 
-                // 縮放
-                let mirrorOutput = tempCanvas;
+                let outputCanvas = tempCanvas;
                 if (preset) {
                     let targetW = isLandscape ? 1920 : 1080;
                     let targetH = isLandscape ? 1080 : 1920;
-                    if (preset === '1280x720') {
-                        targetW = isLandscape ? 1280 : 720;
-                        targetH = isLandscape ? 720 : 1280;
-                    }
+                    if (preset === '1280x720') { targetW = isLandscape ? 1280 : 720; targetH = isLandscape ? 720 : 1280; }
                     const resized = document.createElement('canvas');
-                    resized.width = targetW;
-                    resized.height = targetH;
+                    resized.width = targetW; resized.height = targetH;
                     resized.getContext('2d').drawImage(tempCanvas, 0, 0, targetW, targetH);
-                    mirrorOutput = resized;
+                    outputCanvas = resized;
                 }
 
-                // 套用水平鏡像
-                p.applyHorizontalMirror(mirrorOutput);
-
-                // 處理檔名衝突
-                let mFilename = baseFilename;
-                const fullName = `${userPrefix}M_${mFilename}`;
+                let filename = `${nameParts.join('.')}${suffix}${ext}`;
+                let fullName = `${userPrefix}N_${filename}`;
                 if (usedNames.has(fullName)) {
                     let counter = 1;
-                    const basePart = mFilename.substring(0, mFilename.lastIndexOf(suffix));
-                    while (usedNames.has(`${userPrefix}M_${basePart}_${counter}${suffix}${ext}`)) {
-                        counter++;
-                    }
-                    mFilename = `${basePart}_${counter}${suffix}${ext}`;
+                    while (usedNames.has(`${userPrefix}N_${nameParts.join('.')}_${counter}${suffix}${ext}`)) counter++;
+                    filename = `${nameParts.join('.')}_${counter}${suffix}${ext}`;
                 }
-                usedNames.add(`${userPrefix}M_${mFilename}`);
-                const finalMFilename = `${userPrefix}M_${mFilename}`;
+                usedNames.add(`${userPrefix}N_${filename}`);
 
-                const mirrorExif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
-                const mirrorBlob = await writeExifToBlob(mirrorOutput, mirrorExif, mimeType);
-                if (mirrorBlob) folder.file(finalMFilename, mirrorBlob);
-                updateProgress(++completed.count, total);
+                const exif = (STATE.keepExif && format === 'jpeg') ? STATE.exifData.get(p.id) : null;
+                const blob = await writeExifToBlob(outputCanvas, exif, mimeType);
+                if (blob) folder.file(`${userPrefix}N_${filename}`, blob);
+                updateProgress(++completed.count, totalItems);
             }
 
             resolve(true);
@@ -1484,20 +1408,11 @@ async function downloadAll() {
     } catch (err) {
         console.error('ZIP generation failed:', err);
         alert('建立 ZIP 失敗，已改為個別下載。');
-        // 降級到依序下載
         STATE.processors.forEach((p, i) => {
-            let delay = i * 400;
-            if (includeN) {
-                setTimeout(() => p.download('N'), delay);
-                delay += 200;
-            }
-            if (includeR) {
-                setTimeout(() => p.download('R'), delay);
-                delay += 200;
-            }
-            if (includeM) {
-                setTimeout(() => p.download('M'), delay);
-            }
+            let delay = i * 600;
+            setTimeout(() => p.download('normal'), delay);
+            setTimeout(() => p.download('mirror'), delay + 200);
+            setTimeout(() => p.download('clean'), delay + 400);
         });
     } finally {
         if (btn) {
@@ -1527,16 +1442,6 @@ function updateProgress(current, total) {
 
 // 按鈕事件：下載全部
 downloadAllBtn.addEventListener('click', () => downloadAll());
-
-// 按鈕事件：純淨版下載（只下載 N_ 版本）
-if (downloadCleanBtn) {
-    downloadCleanBtn.addEventListener('click', () => {
-        if (STATE.processors.length === 0) return;
-        STATE.processors.forEach((p, i) => {
-            setTimeout(() => p.download('N'), i * 200);
-        });
-    });
-}
 
 // 按鈕事件：清除全部
 if (clearAllBtn) {

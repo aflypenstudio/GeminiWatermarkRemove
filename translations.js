@@ -32,6 +32,9 @@ const translations = {
         "formatLabel": "格式:",
         "formatPng": "PNG (無損)",
         "formatJpeg": "JPEG (壓縮)",
+        "downloadNormal": "一般下載",
+        "downloadMirror": "鏡射下載",
+        "downloadClean": "純淨下載",
         "zipFolderName": "banana_clean",
         "autoLabel": "自動",
         "positionAuto": "自動偵測位置",
@@ -56,7 +59,9 @@ const translations = {
         "clearAll": "一鍵清空",
         "confirmClearAll": "確定要清除所有圖片？",
         "selectDownloadType": "請至少選擇一種下載類型",
-        "downloadClean": "純淨版下載"
+        "downloadClean": "純淨版下載",
+        "downloadNormal": "一般下載",
+        "downloadMirror": "鏡射下載"
     },
     "zh-CN": {
         "appTitle": "Gemini 水印去除器 & 自动缩小",
@@ -115,7 +120,9 @@ const translations = {
         "clearAll": "清除全部",
         "confirmClearAll": "确定要清除所有图片？",
         "selectDownloadType": "请至少选择一种下载类型",
-        "downloadClean": "纯净版下载"
+        "downloadClean": "纯净版下载",
+        "downloadNormal": "一般下载",
+        "downloadMirror": "镜像下载"
     },
     "en": {
         "appTitle": "Gemini Watermark Remover & Auto Resize",
@@ -174,7 +181,9 @@ const translations = {
         "clearAll": "Clear All",
         "confirmClearAll": "Are you sure you want to clear all images?",
         "selectDownloadType": "Please select at least one download type",
-        "downloadClean": "Clean Version"
+        "downloadClean": "Clean Version",
+        "downloadNormal": "Normal Download",
+        "downloadMirror": "Mirror Download"
     },
     "ja": {
         "appTitle": "Gemini 透かし除去ツール & 自動リサイズ",
@@ -233,7 +242,9 @@ const translations = {
         "clearAll": "すべてクリア",
         "confirmClearAll": "すべての画像を削除してもよろしいですか？",
         "selectDownloadType": "少なくとも1つのダウンロードタイプを選択してください",
-        "downloadClean": "クリーン版"
+        "downloadClean": "クリーン版",
+        "downloadNormal": "通常ダウンロード",
+        "downloadMirror": "ミラーダウンロード"
     },
     "ko": {
         "appTitle": "Gemini 워터마크 제거기 & 자동 크기调整",
@@ -292,6 +303,8 @@ const translations = {
         "clearAll": "모두 지우기",
         "confirmClearAll": "모든 이미지를 삭제하시겠습니까?",
         "selectDownloadType": "최소 하나의 다운로드 유형을 선택하세요",
-        "downloadClean": "순수 버전"
+        "downloadClean": "순수 버전",
+        "downloadNormal": "일반 다운로드",
+        "downloadMirror": "미러 다운로드"
     }
 };
