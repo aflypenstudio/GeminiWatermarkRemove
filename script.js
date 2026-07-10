@@ -30,6 +30,7 @@ const fileInput = document.getElementById('fileInput');
 const resultsContainer = document.getElementById('resultsContainer');
 const globalActions = document.getElementById('globalActions');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
+const downloadCleanBtn = document.getElementById('downloadCleanBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const batchProgress = document.getElementById('batchProgress');
 const progressFill = document.getElementById('progressFill');
@@ -1526,6 +1527,16 @@ function updateProgress(current, total) {
 
 // 按鈕事件：下載全部
 downloadAllBtn.addEventListener('click', () => downloadAll());
+
+// 按鈕事件：純淨版下載（只下載 N_ 版本）
+if (downloadCleanBtn) {
+    downloadCleanBtn.addEventListener('click', () => {
+        if (STATE.processors.length === 0) return;
+        STATE.processors.forEach((p, i) => {
+            setTimeout(() => p.download('N'), i * 200);
+        });
+    });
+}
 
 // 按鈕事件：清除全部
 if (clearAllBtn) {
