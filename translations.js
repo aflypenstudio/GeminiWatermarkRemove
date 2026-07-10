@@ -53,7 +53,7 @@ const translations = {
         "fileNamePrefix": "前綴:",
         "noLogoOption": "無 Logo 版本",
         "optionsTitle": "輸出選項",
-        "clearAll": "清除全部",
+        "clearAll": "一鍵清空",
         "confirmClearAll": "確定要清除所有圖片？",
         "selectDownloadType": "請至少選擇一種下載類型"
     },
