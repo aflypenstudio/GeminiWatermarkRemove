@@ -13,7 +13,9 @@ const CONSTANTS = {
     ALPHA_THRESHOLD: 0.002,
     MAX_ALPHA: 0.99,
     POSITION_SCORE_TOLERANCE: 0.05,
-    POSITION_SCORE_THRESHOLD: 0.2
+    POSITION_SCORE_THRESHOLD: 0.2,
+    GAIN_LIMIT_MIN: 0.1,
+    GAIN_LIMIT_MAX: 1.5
 };
 
 let masks = {
@@ -82,7 +84,13 @@ function removeWatermark(imageData, config) {
     const data = imageData.data;
     let gain = config.alphaGain;
 
-    if (config.autoStrength) {
+    // 檢查是否有全域強度偏移
+    if (config.globalIntensityOffset !== undefined && config.globalIntensityOffset !== 0) {
+        // 強制使用自動偵測，並套用偏移
+        gain = estimateOptimalGain(imageData, mask, posX, posY);
+        gain = clampGain(gain + config.globalIntensityOffset);
+    } else if (config.autoStrength) {
+        // 沒有全域偏移時，按原設定使用自動偵測
         gain = estimateOptimalGain(imageData, mask, posX, posY);
     }
 
@@ -358,7 +366,8 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
     // 細調：在估計值附近搜尋
     const adjustedGain = fineTuneGain(imageData, mask, posX, posY, estimatedGain, watermarkPixels, backgroundPixels);
 
-    return parseFloat(Math.max(0.1, Math.min(1.5, adjustedGain)).toFixed(2));
+    // 返回未四捨五入的值，允許外層套用偏移
+    return Math.max(CONSTANTS.GAIN_LIMIT_MIN, Math.min(CONSTANTS.GAIN_LIMIT_MAX, adjustedGain));
 }
 
 /**
@@ -504,4 +513,14 @@ function clamp8(val) {
     if (val < 0) return 0;
     if (val > 255) return 255;
     return val;
+}
+
+/**
+ * 將增益值限制在允許範圍內，並四捨五入到小數點後兩位
+ * @param {number} gain - 增益值
+ * @returns {number} - 限制並四捨五入後的增益值
+ */
+function clampGain(gain) {
+    const clamped = Math.max(CONSTANTS.GAIN_LIMIT_MIN, Math.min(CONSTANTS.GAIN_LIMIT_MAX, gain));
+    return parseFloat(clamped.toFixed(2));
 }

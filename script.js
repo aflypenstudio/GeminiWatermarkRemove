@@ -21,7 +21,8 @@ const STATE = {
     filenamePrefix: 'R_', // 檔名前綴
     sortBy: 'name', // 'name' | 'date'
     sortOrder: 'asc', // 'asc' | 'desc'
-    exifData: new Map() // 儲存每張圖片的 EXIF 資料
+    exifData: new Map(), // 儲存每張圖片的 EXIF 資料
+    globalIntensityOffset: 0 // 統一強度偏移值（0 = 無偏移，範圍 -0.15 ~ +0.15，步進 0.05）
 };
 
 // Global DOM Elements
@@ -789,12 +790,22 @@ class ImageProcessor {
             // Get Data
             const imageData = this.elements.ctx.getImageData(0, 0, canvas.width, canvas.height);
 
+            // 準備 config：如果有全域強度偏移，强制使用自動強度並套用偏移
+            let processConfig = { ...this.config };
+            if (STATE.globalIntensityOffset !== 0) {
+                processConfig.autoStrength = true;
+                processConfig.globalIntensityOffset = STATE.globalIntensityOffset;
+            } else {
+                // 沒有全域偏移時，不傳遞 (保持 undefined，讓 worker 使用 config 原值)
+                delete processConfig.globalIntensityOffset;
+            }
+
             // Send to Worker
             STATE.worker.postMessage({
                 type: 'PROCESS_IMAGE',
                 payload: {
                     imageData: imageData,
-                    config: this.config,
+                    config: processConfig,
                     id: this.id
                 }
             }, [imageData.data.buffer]); // Transfer buffer
@@ -807,10 +818,23 @@ class ImageProcessor {
         this.state.watermarkRegion = watermarkRegion || null;
 
         // 如果是自動強度偵測，更新 UI 的 Label 和 Slider 值
-        if (this.config.autoStrength && appliedGain !== undefined) {
-            this.config.alphaGain = appliedGain;
-            this.elements.alphaValue.textContent = `Auto (${appliedGain.toFixed(2)})`;
-            this.elements.alphaInput.value = appliedGain;
+        if (appliedGain !== undefined) {
+            const hasGlobalOffset = STATE.globalIntensityOffset !== 0;
+            if (hasGlobalOffset) {
+                // 使用全域偏移時，顯示最終套用的增益值
+                this.config.alphaGain = appliedGain;
+                this.elements.alphaValue.textContent = `Global (${appliedGain.toFixed(2)})`;
+                this.elements.alphaInput.value = appliedGain;
+            } else if (this.config.autoStrength) {
+                // 原有的自動偵測顯示
+                this.config.alphaGain = appliedGain;
+                this.elements.alphaValue.textContent = `Auto (${appliedGain.toFixed(2)})`;
+                this.elements.alphaInput.value = appliedGain;
+            } else {
+                // 手動設定
+                this.elements.alphaValue.textContent = this.config.alphaGain.toFixed(2);
+                this.elements.alphaInput.value = this.config.alphaGain;
+            }
         }
 
         // Put Back (after watermark removal)
@@ -1438,12 +1462,6 @@ function clearAllNoConfirm() {
 
     // 更新 UI 狀態
     updateUIState();
-}
-
-function reprocessAllImages() {
-    STATE.processors.forEach(p => {
-        p.processAndRender();
-    });
 }
 
 // Download Format Selector
@@ -2181,3 +2199,91 @@ const ThemeManager = {
 init();
 // Initialize Lightbox
 Lightbox.init();
+
+// =============================================================================
+// Global Intensity Controls
+// =============================================================================
+
+const globalIntensitySlider = document.getElementById('globalIntensitySlider');
+const globalIntensityValue = document.getElementById('globalIntensityValue');
+const globalIntensityDecrease = document.getElementById('globalIntensityDecrease');
+const globalIntensityIncrease = document.getElementById('globalIntensityIncrease');
+const globalIntensityReset = document.getElementById('globalIntensityReset');
+
+function updateGlobalIntensityDisplay() {
+    const offset = STATE.globalIntensityOffset;
+    const offsetText = offset === 0 ? '±0.00' : (offset > 0 ? `+${offset.toFixed(2)}` : offset.toFixed(2));
+
+    globalIntensityValue.textContent = offsetText;
+
+    // Update visual state
+    globalIntensityValue.classList.remove('positive', 'negative');
+    if (offset > 0) {
+        globalIntensityValue.classList.add('positive');
+    } else if (offset < 0) {
+        globalIntensityValue.classList.add('negative');
+    }
+
+    // Update slider thumb color
+    if (globalIntensitySlider) {
+        globalIntensitySlider.value = offset / 0.05; // Convert offset back to steps
+    }
+}
+
+function applyGlobalIntensityChange() {
+    // 如果有圖片需要處理，重新處理所有圖片
+    if (STATE.processors.length > 0) {
+        reprocessAllImages();
+    }
+}
+
+function setGlobalIntensity(step) {
+    let newOffset = STATE.globalIntensityOffset + step * 0.05;
+    // 限制在 -0.15 ~ +0.15 範圍內
+    newOffset = Math.max(-0.15, Math.min(0.15, newOffset));
+    // 四捨五入到小數點後兩位
+    newOffset = Math.round(newOffset * 100) / 100;
+    STATE.globalIntensityOffset = newOffset;
+    updateGlobalIntensityDisplay();
+    applyGlobalIntensityChange();
+}
+
+// Slider change event
+if (globalIntensitySlider) {
+    globalIntensitySlider.addEventListener('input', (e) => {
+        const steps = parseInt(e.target.value);
+        STATE.globalIntensityOffset = steps * 0.05;
+        updateGlobalIntensityDisplay();
+    });
+
+    globalIntensitySlider.addEventListener('change', () => {
+        applyGlobalIntensityChange();
+    });
+}
+
+// Decrease button
+if (globalIntensityDecrease) {
+    globalIntensityDecrease.addEventListener('click', () => {
+        setGlobalIntensity(-1);
+    });
+}
+
+// Increase button
+if (globalIntensityIncrease) {
+    globalIntensityIncrease.addEventListener('click', () => {
+        setGlobalIntensity(1);
+    });
+}
+
+// Reset button
+if (globalIntensityReset) {
+    globalIntensityReset.addEventListener('click', () => {
+        STATE.globalIntensityOffset = 0;
+        globalIntensitySlider.value = 0;
+        updateGlobalIntensityDisplay();
+        applyGlobalIntensityChange();
+    });
+}
+
+// 初始化顯示
+updateGlobalIntensityDisplay();

@@ -79,7 +79,10 @@ const translations = {
         "forceLarge": "強制大",
         "livePreview": "即時預覽",
         "cancel": "取消",
-        "apply": "套用"
+        "apply": "套用",
+        "globalIntensityLabel": "📊 統一強度調整",
+        "globalIntensityHint": "套用到所有圖片（取消個別設定）",
+        "reset": "重置"
     },
     "zh-CN": {
         "appTitle": "巴娜娜去水印&微调器",
@@ -161,7 +164,10 @@ const translations = {
         "forceLarge": "强制大",
         "livePreview": "实时预览",
         "cancel": "取消",
-        "apply": "应用"
+        "apply": "应用",
+        "globalIntensityLabel": "📊 统一强度调整",
+        "globalIntensityHint": "应用到所有图片（取消个别设定）",
+        "reset": "重置"
     },
     "en": {
         "appTitle": "Banana Watermark Remover & Adjuster",
@@ -243,7 +249,10 @@ const translations = {
         "forceLarge": "Force Large",
         "livePreview": "Live Preview",
         "cancel": "Cancel",
-        "apply": "Apply"
+        "apply": "Apply",
+        "globalIntensityLabel": "📊 Unified Intensity Adjustment",
+        "globalIntensityHint": "Apply to all images (override individual settings)",
+        "reset": "Reset"
     },
     "ja": {
         "appTitle": "巴娜娜去水印&微調整ツール",
@@ -325,7 +334,10 @@ const translations = {
         "forceLarge": "大強制",
         "livePreview": "ライブプレビュー",
         "cancel": "キャンセル",
-        "apply": "適用"
+        "apply": "適用",
+        "globalIntensityLabel": "📊 統合強度調整",
+        "globalIntensityHint": "すべての画像に適用（個別設定を解除）",
+        "reset": "リセット"
     },
     "ko": {
         "appTitle": "바나나 워터마크 제거기 & 조정기",
@@ -407,6 +419,9 @@ const translations = {
         "forceLarge": "대强制",
         "livePreview": "실시간 미리보기",
         "cancel": "취소",
-        "apply": "적용"
+        "apply": "적용",
+        "globalIntensityLabel": "📊 통합 강도 조절",
+        "globalIntensityHint": "모든 이미지에 적용 (개별 설정 해제)",
+        "reset": "초기화"
     }
 };

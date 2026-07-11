@@ -55,7 +55,24 @@
                 <span data-i18n="appTitle">巴娜娜去水印&微調器</span>
             </h1>
             <p class="subtitle" data-i18n="appSubtitle">使用逆向 Alpha 混合技術去除 Gemini 生成圖片中的可見浮水印。</p>
-                    </header>
+        </header>
+
+        <!-- 統一強度調整區塊 -->
+        <div id="globalIntensitySection" class="global-intensity-section">
+            <div class="global-intensity-header">
+                <span class="global-intensity-title" data-i18n="globalIntensityLabel">📊 統一強度調整</span>
+                <span class="global-intensity-hint" data-i18n="globalIntensityHint">套用到所有圖片（取消個別設定）</span>
+            </div>
+            <div class="global-intensity-controls">
+                <button id="globalIntensityDecrease" class="global-intensity-btn" title="減弱">−</button>
+                <input type="range" id="globalIntensitySlider" min="-3" max="3" step="1" value="0">
+                <button id="globalIntensityIncrease" class="global-intensity-btn" title="增強">+</button>
+                <span id="globalIntensityValue" class="global-intensity-value">±0.00</span>
+                <button id="globalIntensityReset" class="btn btn-small btn-secondary">
+                    <span data-i18n="reset">重置</span>
+                </button>
+            </div>
+        </div>
 
         <div class="app-card">
             <!-- 輸出選項設定區塊（可收合式） -->

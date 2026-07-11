@@ -412,6 +412,41 @@ body.has-files .app-card {
   }
 
   /* ========================================
+     Mobile: Global Intensity Section
+     ======================================== */
+  .global-intensity-section {
+    padding: 0.75rem 1rem;
+  }
+
+  .global-intensity-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .global-intensity-hint {
+    font-size: 0.7rem;
+  }
+
+  .global-intensity-controls {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  #globalIntensitySlider {
+    flex: 1 1 100%;
+    order: -1;
+    width: 100%;
+    margin-bottom: -0.25rem;
+  }
+
+  .global-intensity-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+
+  /* ========================================
      Mobile: Global Actions (Format + Download)
      ======================================== */
   .global-actions {
@@ -704,8 +739,115 @@ body.has-files .app-card {
   gap: 0.5rem;
 }
 
-/* Output Settings */
-.output-row {
+/* Global Intensity Section */
+.global-intensity-section {
+    background-color: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 0.75rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+}
+
+[data-theme="light"] .global-intensity-section {
+    background-color: rgba(124, 58, 237, 0.05);
+    border-color: rgba(124, 58, 237, 0.2);
+}
+
+.global-intensity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.global-intensity-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.global-intensity-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.global-intensity-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.global-intensity-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 0.5rem;
+    background: rgba(124, 58, 237, 0.2);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.global-intensity-btn:hover {
+    background: rgba(124, 58, 237, 0.4);
+    transform: scale(1.05);
+}
+
+[data-theme="light"] .global-intensity-btn {
+    background: rgba(124, 58, 237, 0.15);
+}
+
+[data-theme="light"] .global-intensity-btn:hover {
+    background: rgba(124, 58, 237, 0.3);
+}
+
+#globalIntensitySlider {
+    flex: 1;
+    height: 6px;
+    accent-color: #7c3aed;
+    cursor: pointer;
+}
+
+.global-intensity-value {
+    min-width: 60px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.35rem;
+}
+
+[data-theme="light"] .global-intensity-value {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.global-intensity-value.positive {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.global-intensity-value.negative {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+/* Hide global intensity section when no files (keep it visible for setup) */
+/* .global-intensity-section:has(~ .app-card .results-container:empty) { ... } */
+
+/* Adjust app-card margin when intensity section is present */
+.app-card {
+    margin-top: 0;
+}
+
+/* ====================================== */
+/* Output Settings (Collapsible) */
   display: flex;
   align-items: center;
   gap: 1.5rem;
