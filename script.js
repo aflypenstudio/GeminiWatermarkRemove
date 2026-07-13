@@ -25,6 +25,17 @@ const STATE = {
     globalIntensityOffset: 0 // 統一強度偏移值（0 = 無偏移，範圍 -0.15 ~ +0.15，步進 0.05）
 };
 
+// =============================================================================
+// Debounce Utility
+// =============================================================================
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
 // Global DOM Elements
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -2262,16 +2273,19 @@ function setGlobalIntensity(step) {
     applyGlobalIntensityChange();
 }
 
-// Slider change event
+// Slider - debounced reprocessing
 if (globalIntensitySlider) {
+    const debouncedApply = debounce(() => {
+        if (STATE.processors.length > 0) {
+            reprocessAllImages();
+        }
+    }, 100);
+
     globalIntensitySlider.addEventListener('input', (e) => {
         const steps = parseInt(e.target.value);
         STATE.globalIntensityOffset = steps * 0.05;
         updateGlobalIntensityDisplay();
-    });
-
-    globalIntensitySlider.addEventListener('change', () => {
-        applyGlobalIntensityChange();
+        debouncedApply();
     });
 }
 
