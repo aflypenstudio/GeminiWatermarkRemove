@@ -14,8 +14,10 @@ const CONSTANTS = {
     MAX_ALPHA: 0.99,
     POSITION_SCORE_TOLERANCE: 0.05,
     POSITION_SCORE_THRESHOLD: 0.2,
-    GAIN_LIMIT_MIN: 0.1,
-    GAIN_LIMIT_MAX: 1.5
+    GAIN_LIMIT_MIN: 0.05,  // 擴大最小值
+    GAIN_LIMIT_MAX: 1.5,
+    DARK_SCENE_THRESHOLD: 80,  // 暗色場景判定閾值
+    SUBTLE_DIFF_THRESHOLD: 0.5  // 細微水印相對差異閾值
 };
 
 let masks = {
@@ -238,8 +240,9 @@ function scoreWatermarkCandidate(imageData, mask, region) {
  * 原理：
  * 1. 分析水印區域的亮度分佈
  * 2. 分析相鄰背景的亮度分佈
- * 3. 找出水印的實際亮度值（白或黑）
- * 4. 計算需要的增益值
+ * 3. 偵測場景類型（明亮/暗色系）
+ * 4. 根據場景和類型估算增益
+ * 5. 細調搜尋最佳值
  */
 function estimateOptimalGain(imageData, mask, posX, posY) {
     const data = imageData.data;
@@ -274,9 +277,9 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
         return 0.5;
     }
 
-    // 收集背景像素
+    // 收集背景像素 - 擴大取樣範圍
     const backgroundPixels = [];
-    const sampleRange = 15;
+    const sampleRange = 20;  // 擴大取樣範圍
     const margin = 5;
 
     for (const px of watermarkPixels) {
@@ -284,7 +287,11 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
             { dx: -1, dy: 0 },
             { dx: 1, dy: 0 },
             { dx: 0, dy: -1 },
-            { dx: 0, dy: 1 }
+            { dx: 0, dy: 1 },
+            { dx: -1, dy: -1 },
+            { dx: 1, dy: -1 },
+            { dx: -1, dy: 1 },
+            { dx: 1, dy: 1 }
         ];
 
         for (const dir of directions) {
@@ -312,10 +319,28 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
         }
     }
 
-    // 也從水印區域外的大範圍取樣背景
-    const outerMargin = Math.max(mask.width, mask.height) + 10;
-    for (let sy = Math.max(0, posY - outerMargin); sy < Math.min(h, posY + mask.height + outerMargin); sy += 20) {
-        for (let sx = Math.max(0, posX - outerMargin); sx < Math.min(w, posX + mask.width + outerMargin); sx += 20) {
+    // 也從水印區域外的大範圍取樣背景（擴大範圍）
+    const outerMargin = Math.max(mask.width, mask.height) * 2 + 30;
+    for (let sy = Math.max(0, posY - outerMargin); sy < Math.min(h, posY + mask.height + outerMargin); sy += 15) {
+        for (let sx = Math.max(0, posX - outerMargin); sx < Math.min(w, posX + mask.width + outerMargin); sx += 15) {
+            const inMask = sx >= posX && sx < posX + mask.width && sy >= posY && sy < posY + mask.height;
+            if (!inMask) {
+                const idx = sy * stride + sx * 4;
+                backgroundPixels.push(data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114);
+            }
+        }
+    }
+
+    // 加入隨機取樣點避免偏見
+    const centerX = posX + mask.width / 2;
+    const centerY = posY + mask.height / 2;
+    const randomSampleRadius = outerMargin + 20;
+    for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * 2 * Math.PI;
+        const radius = outerMargin + Math.random() * 20;
+        const sx = Math.round(centerX + Math.cos(angle) * radius);
+        const sy = Math.round(centerY + Math.sin(angle) * radius);
+        if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
             const inMask = sx >= posX && sx < posX + mask.width && sy >= posY && sy < posY + mask.height;
             if (!inMask) {
                 const idx = sy * stride + sx * 4;
@@ -331,43 +356,112 @@ function estimateOptimalGain(imageData, mask, posX, posY) {
     const wmStats = calculateStats(watermarkBrightness);
     const bgStats = calculateStats(backgroundPixels);
 
-    // 決定水印類型
+    // 判斷場景類型
+    const bgMean = bgStats.mean;
+    const isDarkScene = bgMean < CONSTANTS.DARK_SCENE_THRESHOLD;
+    const globalContrast = bgStats.stdDev;
+
+    // 判斷水印類型（亮/暗/細微）
     const brightnessDiff = wmStats.median - bgStats.median;
-    const isLightWatermark = brightnessDiff > 0;
+    const relativeDiff = globalContrast > 0 ? Math.abs(brightnessDiff) / (globalContrast + 1) : Math.abs(brightnessDiff) / 25;
 
-    // 根據水印類型和亮度差異估算初步增益
-    let estimatedGain = 0.5;
-    const p95 = percentile([...watermarkBrightness].sort((a, b) => a - b), 0.95);
-
-    if (isLightWatermark) {
-        const brightnessExcess = wmStats.median - bgStats.median;
-        if (brightnessExcess > 60 || p95 > bgStats.median + 80) {
-            estimatedGain = 0.25; // 水印很明顯亮
-        } else if (brightnessExcess > 40 || p95 > bgStats.median + 60) {
-            estimatedGain = 0.35;
-        } else if (brightnessExcess > 20 || p95 > bgStats.median + 40) {
-            estimatedGain = 0.5;
-        } else if (brightnessExcess > 10) {
-            estimatedGain = 0.65;
-        }
-    } else {
-        const brightnessDeficit = bgStats.median - wmStats.median;
-        if (brightnessDeficit > 60) {
-            estimatedGain = 0.2;
-        } else if (brightnessDeficit > 40) {
-            estimatedGain = 0.3;
-        } else if (brightnessDeficit > 20) {
-            estimatedGain = 0.45;
-        } else if (brightnessDeficit > 10) {
-            estimatedGain = 0.55;
-        }
+    let watermarkType = 'neutral';
+    if (relativeDiff < CONSTANTS.SUBTLE_DIFF_THRESHOLD) {
+        watermarkType = 'subtle';
+    } else if (brightnessDiff > 10) {
+        watermarkType = 'light';
+    } else if (brightnessDiff < -10) {
+        watermarkType = 'dark';
     }
 
+    // 根據場景和水印類型估算初步增益
+    let estimatedGain = estimateGainByScene(wmStats, bgStats, isDarkScene, watermarkType);
+
     // 細調：在估計值附近搜尋
-    const adjustedGain = fineTuneGain(imageData, mask, posX, posY, estimatedGain, watermarkPixels, backgroundPixels);
+    const adjustedGain = fineTuneGain(imageData, mask, posX, posY, estimatedGain, watermarkPixels, backgroundPixels, isDarkScene);
 
     // 返回未四捨五入的值，允許外層套用偏移
     return Math.max(CONSTANTS.GAIN_LIMIT_MIN, Math.min(CONSTANTS.GAIN_LIMIT_MAX, adjustedGain));
+}
+
+/**
+ * 根據場景和水印類型估算增益
+ */
+function estimateGainByScene(wmStats, bgStats, isDarkScene, watermarkType) {
+    const brightnessDiff = wmStats.median - bgStats.median;
+    const absDiff = Math.abs(brightnessDiff);
+    const p95 = percentile([...wmStats.median > bgStats.median ? [] : []].concat(wmStats.p75 ? wmStats.p75 : []), 0.95);
+    const sortedWM = [...wmStats.p75 ? [wmStats.median] : []].concat([wmStats.p75 || wmStats.median]);
+
+    // 計算 95 百分位
+    const wmSorted = [wmStats.p25, wmStats.median, wmStats.p75, wmStats.median + (wmStats.p75 - wmStats.median)].filter(v => v !== undefined);
+    const p95Val = percentile(wmSorted, 0.95);
+    const contrastToBg = Math.abs((p95Val || wmStats.median) - bgStats.median);
+
+    // 預設增益
+    let baseGain = 0.5;
+
+    if (isDarkScene) {
+        // 暗色場景：細微水印需要更強處理，調整增益範圍
+        if (watermarkType === 'subtle') {
+            baseGain = absDiff > 15 ? 0.35 : 0.50;
+        } else if (watermarkType === 'light') {
+            // 明亮水印在暗色背景下
+            if (absDiff > 60 || contrastToBg > 80) {
+                baseGain = 0.15;
+            } else if (absDiff > 40 || contrastToBg > 60) {
+                baseGain = 0.25;
+            } else if (absDiff > 25 || contrastToBg > 40) {
+                baseGain = 0.40;
+            } else if (absDiff > 15) {
+                baseGain = 0.50;
+            } else {
+                baseGain = 0.55;
+            }
+        } else if (watermarkType === 'dark') {
+            // 暗色水印在暗色背景下 - 通常難以偵測
+            if (absDiff > 40) {
+                baseGain = 0.20;
+            } else if (absDiff > 25) {
+                baseGain = 0.30;
+            } else if (absDiff > 15) {
+                baseGain = 0.45;
+            } else {
+                baseGain = 0.55;
+            }
+        }
+    } else {
+        // 明亮場景
+        if (watermarkType === 'subtle') {
+            baseGain = 0.55;
+        } else if (watermarkType === 'light') {
+            if (absDiff > 60 || contrastToBg > 80) {
+                baseGain = 0.20;
+            } else if (absDiff > 40 || contrastToBg > 60) {
+                baseGain = 0.35;
+            } else if (absDiff > 20 || contrastToBg > 40) {
+                baseGain = 0.50;
+            } else if (absDiff > 10) {
+                baseGain = 0.60;
+            } else {
+                baseGain = 0.65;
+            }
+        } else if (watermarkType === 'dark') {
+            if (absDiff > 60) {
+                baseGain = 0.20;
+            } else if (absDiff > 40) {
+                baseGain = 0.30;
+            } else if (absDiff > 20) {
+                baseGain = 0.45;
+            } else if (absDiff > 10) {
+                baseGain = 0.55;
+            } else {
+                baseGain = 0.60;
+            }
+        }
+    }
+
+    return baseGain;
 }
 
 /**
@@ -411,37 +505,39 @@ function percentile(sortedValues, p) {
 
 /**
  * 在估計值附近進行細調
+ * 根據場景類型自適應搜尋範圍和評分標準
  * 返回最佳增益值
  */
-function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, backgroundPixels) {
+function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, backgroundPixels, isDarkScene) {
     const data = imageData.data;
     const w = imageData.width;
     const h = imageData.height;
     const stride = w * 4;
 
-    // 搜尋範圍：baseGain ± 0.25
-    const searchStart = Math.max(0.1, baseGain - 0.25);
-    const searchEnd = Math.min(1.5, baseGain + 0.25);
+    // 根據場景類型動態設定搜尋範圍
+    // 暗色場景需要更大的搜尋範圍來找到最佳值
+    const searchRange = isDarkScene ? 0.4 : 0.25;
+    const searchStart = Math.max(CONSTANTS.GAIN_LIMIT_MIN, baseGain - searchRange);
+    const searchEnd = Math.min(CONSTANTS.GAIN_LIMIT_MAX, baseGain + searchRange);
     const step = 0.05;
 
     let bestGain = baseGain;
     let bestScore = Number.NEGATIVE_INFINITY;
 
-    // 計算背景的平均亮度
-    const bgMean = backgroundPixels.reduce((a, b) => a + b, 0) / backgroundPixels.length;
+    // 計算背景的統計資料
+    const bgStats = calculateStats(backgroundPixels);
+    const bgMean = bgStats.mean;
+    const bgStdDev = bgStats.stdDev;
 
     for (let g = searchStart; g <= searchEnd; g += step) {
-        // 評估 gain 的效果：
-        // 理論上，處理後的水印區域亮度應該與背景接近
-        // 計算處理後所有水印像素與背景平均亮度的差異
-
+        // 評估 gain 的效果
         let totalAbsDiff = 0;
         let count = 0;
 
         for (const px of watermarkPixels) {
             if (px.alpha < 0.15) continue;
 
-            // 逆向 Alpha 混合（假設水印是亮的，LOGO_VALUE = 255）
+            // 逆向 Alpha 混合
             const effectiveAlpha = Math.min(0.95, px.alpha * g);
             const oneMinusAlpha = 1.0 - effectiveAlpha;
             const idx = px.y * stride + px.x * 4;
@@ -450,7 +546,7 @@ function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, ba
             const gv = data[idx + 1];
             const bv = data[idx + 2];
 
-            // 逆混合：original = (current - alpha * 255) / (1 - alpha)
+            // 逆混合
             const originalR = oneMinusAlpha > 0.01 ? (r - effectiveAlpha * 255) / oneMinusAlpha : r;
             const originalG = oneMinusAlpha > 0.01 ? (gv - effectiveAlpha * 255) / oneMinusAlpha : gv;
             const originalB = oneMinusAlpha > 0.01 ? (bv - effectiveAlpha * 255) / oneMinusAlpha : bv;
@@ -464,12 +560,12 @@ function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, ba
 
         const avgDiff = totalAbsDiff / count;
 
-        // 分數越高越好（處理後與背景越接近越好）
-        // 理想情況：avgDiff = 0，但考慮到 JPEG 壓縮等因素，5-15 的差異是可接受的
-        // 用高斯衰減：差異越小分數越高
-        const diffScore = Math.exp(-avgDiff / 20);
+        // 根據場景類型調整評分標準
+        // 暗色照片對差異的敏感度較低（JPEG 壓縮影響更大）
+        const scoreNormalizationFactor = isDarkScene ? 35 : 20;
+        const diffScore = Math.exp(-avgDiff / scoreNormalizationFactor);
 
-        // 額外評估：處理後內部是否一致（標準差）
+        // 評估處理後的一致性
         const correctedBrightnesses = [];
         for (const px of watermarkPixels) {
             if (px.alpha < 0.15) continue;
@@ -486,10 +582,12 @@ function fineTuneGain(imageData, mask, posX, posY, baseGain, watermarkPixels, ba
             const mean = correctedBrightnesses.reduce((a, b) => a + b, 0) / correctedBrightnesses.length;
             const variance = correctedBrightnesses.reduce((acc, val) => acc + (val - mean) ** 2, 0) / correctedBrightnesses.length;
             const stdDev = Math.sqrt(variance);
-            // 標準差越小越好（< 10 為理想）
-            uniformityScore = Math.max(0, 1 - stdDev / 30);
+            // 暗色場景標準差容忍度提高
+            const uniformityNormalization = isDarkScene ? 40 : 30;
+            uniformityScore = Math.max(0, 1 - stdDev / uniformityNormalization);
         }
 
+        // 總分：差異匹配 60% + 均勻性 40%
         const totalScore = diffScore * 0.6 + uniformityScore * 0.4;
 
         if (totalScore > bestScore) {
